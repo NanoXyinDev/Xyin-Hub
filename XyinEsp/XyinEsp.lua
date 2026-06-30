@@ -1,7 +1,7 @@
 -- ============================================
--- N4n0Xy1n Xy1nESP v6.1 - YT BUG FIX EDITION
+-- N4n0Xy1n Xy1nESP v6.2 - AUTO KILL EDITION
 -- @RukanooXD_YT // Pembuat Script
--- F34tur3s: ESP, K1ll 4ur4, T3l3p0rt, Byp4ss C01n,
+-- F34tur3s: ESP, Auto Kill, T3l3p0rt, Byp4ss C01n,
 -- Sp33d, Jump, 4ut0 S4f3, S33k3r D3t3ct0r, M0d3rn B&W UI
 -- BUG FIX: AutoSafe, AutoCoin, Speed, Jump
 -- Y0uTub3 R34dy - C1n3m4t1c & Pr0f3ss10n4l
@@ -48,10 +48,10 @@ local Settings = {
     SeekerColor = Color3.fromRGB(255, 255, 255),
     HiderColor = Color3.fromRGB(150, 150, 150),
     DeadColor = Color3.fromRGB(80, 80, 80),
-    -- C0mb4t
-    KillAura_Enabled = false,
-    KillAura_Radius = 30,
-    KillAura_Delay = 0.05,
+    -- C0mb4t - Auto Kill (renamed from Kill Aura)
+    AutoKill_Enabled = false,
+    AutoKill_Radius = 30,
+    AutoKill_Delay = 0.05,
     FastKill = false,
     -- T3l3p0rt
     TeleportHider_Enabled = false,
@@ -350,14 +350,14 @@ local function UpdateESP()
 end
 
 -- ============================================
--- K1LL 4UR4 - F4ST & F1X3D
+-- 4UT0 K1LL - F4ST & F1X3D (renamed from Kill Aura)
 -- ============================================
-local KillConn = nil
+local AutoKillConn = nil
 
-local function StartKillAura()
-    if KillConn then return end
-    KillConn = RunService.Heartbeat:Connect(function()
-        if not Settings.KillAura_Enabled then return end
+local function StartAutoKill()
+    if AutoKillConn then return end
+    AutoKillConn = RunService.Heartbeat:Connect(function()
+        if not Settings.AutoKill_Enabled then return end
         if not AmISeeker() then return end
         
         local lChar = LocalPlayer.Character
@@ -392,7 +392,7 @@ local function StartKillAura()
             if not hrp or not hum then continue end
             
             local dist = (hrp.Position - lHRP.Position).Magnitude
-            if dist <= Settings.KillAura_Radius then
+            if dist <= Settings.AutoKill_Radius then
                 pcall(function() hum:TakeDamage(100) end)
                 pcall(function() hum.Health = 0 end)
                 
@@ -421,7 +421,7 @@ local function StartKillAura()
                     end)
                 end
             end
-            task.wait(Settings.KillAura_Delay)
+            task.wait(Settings.AutoKill_Delay)
         end
     end)
 end
@@ -912,7 +912,7 @@ end
 -- 1N1T14L1Z3 4LL SYST3M5
 -- ============================================
 RunService.RenderStepped:Connect(UpdateESP)
-StartKillAura()
+StartAutoKill()
 StartAutoSafe()
 StartSeekerDetector()
 StartSpeedHack()
@@ -1015,7 +1015,7 @@ local Sub = Instance.new("TextLabel")
 Sub.Size = UDim2.new(0, 600, 0, 25 * UIScale)
 Sub.Position = UDim2.new(0.5, -300, 0.38, 0)
 Sub.BackgroundTransparency = 1
-Sub.Text = "Xy1nESP v6.1 YT Bug Fix // プレイヤーESP // Игрок ESP"
+Sub.Text = "Xy1nESP v6.2 Auto Kill // プレイヤーESP // Игрок ESP"
 Sub.TextColor3 = Color3.fromRGB(120, 120, 120)
 Sub.TextSize = 13 * UIScale
 Sub.Font = Enum.Font.Gotham
@@ -1161,7 +1161,7 @@ local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(1, -120, 0, 28 * UIScale)
 TitleText.Position = UDim2.new(0, 18, 0, 6)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Xy1nESP v6.1"
+TitleText.Text = "Xy1nESP v6.2"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.TextSize = 18 * UIScale
 TitleText.Font = Enum.Font.GothamBlack
@@ -1446,11 +1446,11 @@ MakeToggle(ESPContent, "Distance ESP", "Distance_ESP", "Jarak ke player")
 MakeToggle(ESPContent, "Health ESP", "Health_ESP", "Health bar")
 MakeSlider(ESPContent, "Max Distance", "MaxDistance", 50, 2000, "m")
 
--- C0MB4T T4B
-MakeToggle(CombatContent, "Kill Aura", "KillAura_Enabled", "Auto attack hider // キルオーラ // Килл Аура")
+-- C0MB4T T4B - Auto Kill (renamed dari Kill Aura)
+MakeToggle(CombatContent, "Auto Kill", "AutoKill_Enabled", "Auto attack hider // オートキル // Авто Убийство")
 MakeToggle(CombatContent, "Fast Kill", "FastKill", "Kill instant with tool")
-MakeSlider(CombatContent, "Kill Aura Radius", "KillAura_Radius", 5, 50, " studs")
-MakeSlider(CombatContent, "Kill Aura Delay", "KillAura_Delay", 0.01, 1, "s")
+MakeSlider(CombatContent, "Auto Kill Radius", "AutoKill_Radius", 5, 50, " studs")
+MakeSlider(CombatContent, "Auto Kill Delay", "AutoKill_Delay", 0.01, 1, "s")
 MakeToggle(CombatContent, "Teleport Hider", "TeleportHider_Enabled", "Teleport ke hider")
 MakeSlider(CombatContent, "Teleport Delay", "TeleportHider_Delay", 0.5, 5, "s")
 MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Kabur otomatis dari Seeker")
@@ -1576,7 +1576,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
         end
     end
     if input.KeyCode == Enum.KeyCode.Insert then Settings.ESP_Enabled = not Settings.ESP_Enabled end
-    if input.KeyCode == Enum.KeyCode.Home then Settings.KillAura_Enabled = not Settings.KillAura_Enabled end
+    if input.KeyCode == Enum.KeyCode.Home then Settings.AutoKill_Enabled = not Settings.AutoKill_Enabled end
     if input.KeyCode == Enum.KeyCode.PageUp then Settings.TeleportHider_Enabled = not Settings.TeleportHider_Enabled end
     if input.KeyCode == Enum.KeyCode.End then Settings.AutoCoin_Enabled = not Settings.AutoCoin_Enabled end
     if input.KeyCode == Enum.KeyCode.Delete then Settings.SpeedHack = not Settings.SpeedHack end
@@ -1626,7 +1626,7 @@ task.delay(5, function()
     NT.Size = UDim2.new(1, -20, 0.35, 0)
     NT.Position = UDim2.new(0, 10, 0, 8)
     NT.BackgroundTransparency = 1
-    NT.Text = "Xy1nESP v6.1 YT G4C0R!"
+    NT.Text = "Xy1nESP v6.2 Auto Kill G4C0R!"
     NT.TextColor3 = Color3.fromRGB(255, 255, 255)
     NT.TextSize = 15 * UIScale
     NT.Font = Enum.Font.GothamBlack
@@ -1646,7 +1646,7 @@ task.delay(5, function()
     NK.Size = UDim2.new(1, -20, 0.35, 0)
     NK.Position = UDim2.new(0, 10, 0.65, 0)
     NK.BackgroundTransparency = 1
-    NK.Text = "R1ghtAlt:M3nu | 1ns3rt:ESP | H0m3:K1ll | PgUp:TP | 3nd:C01n | D3l:Sp33d"
+    NK.Text = "R1ghtAlt:M3nu | 1ns3rt:ESP | H0m3:AutoK1ll | PgUp:TP | 3nd:C01n | D3l:Sp33d"
     NK.TextColor3 = Color3.fromRGB(100, 100, 100)
     NK.TextSize = 9 * UIScale
     NK.Font = Enum.Font.Gotham
@@ -1664,12 +1664,12 @@ end)
 -- ============================================
 -- F1N4L PR1NT
 -- ============================================
-print("[N4n0Xy1n] Xy1nESP v6.1 YT Bug Fix L04D3D")
+print("[N4n0Xy1n] Xy1nESP v6.2 Auto Kill Edition L04D3D")
 print("[N4n0Xy1n] - .... . / .... .- -.-. -.- / .. ... / .-. . .- .-..")
-print("[N4n0Xy1n] プレイヤーESP v6.1 バグ修正 ロード完了")
-print("[N4n0Xy1n] Игрок ESP v6.1 Исправление багов загружен")
+print("[N4n0Xy1n] プレイヤーESP v6.2 オートキル ロード完了")
+print("[N4n0Xy1n] Игрок ESP v6.2 Авто Убийство загружен")
 print("[N4n0Xy1n] @RukanooXD_YT")
 print("[N4n0Xy1n] R0l3: " .. GetRole(LocalPlayer))
 print("[N4n0Xy1n] D3v1c3: " .. (IsMobile and "M0b1l3" or "L4pt0p"))
-print("[N4n0Xy1n] F1x3s: AutoSafe, AutoCoin, Speed, Jump")
+print("[N4n0Xy1n] F1x3s: AutoSafe, AutoCoin, Speed, Jump, AutoKill")
 
