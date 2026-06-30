@@ -1,8 +1,9 @@
 -- ============================================
--- N4n0Xy1n Xy1nESP v5.0 - B&W 3D1T10N
+-- N4n0Xy1n Xy1nESP v6.0 - YT 3D1T10N
 -- @RukanooXD_YT // Pembuat Script
 -- F34tur3s: ESP, K1ll 4ur4, T3l3p0rt, Byp4ss C01n,
--- Sp33d, Jump, 4ut0 S4f3, M0d3rn B&W UI
+-- Sp33d, Jump, 4ut0 S4f3, S33k3r D3t3ct0r, M0d3rn B&W UI
+-- Y0uTub3 R34dy - C1n3m4t1c & Pr0f3ss10n4l
 -- L4ngu4g3: 1nd0 + 3ngl15h + J4p4n353 + Ru5514n
 -- ============================================
 
@@ -21,7 +22,7 @@ local IsMobile = UserInputService.TouchEnabled and not UserInputService.Keyboard
 local UIScale = IsMobile and 0.85 or 1
 
 -- ============================================
--- S3TT1NGS - B&W TH3M3
+-- S3TT1NGS - B&W YT TH3M3
 -- ============================================
 local Settings = {
     -- ESP
@@ -31,7 +32,6 @@ local Settings = {
     Name_ESP = false,
     Distance_ESP = false,
     Health_ESP = false,
-    TeamCheck = false,
     MaxDistance = 1000,
     LineOrigin = "Bottom",
     TextSize = 13,
@@ -48,7 +48,7 @@ local Settings = {
     DeadColor = Color3.fromRGB(80, 80, 80),
     -- C0mb4t
     KillAura_Enabled = false,
-    KillAura_Radius = 25,
+    KillAura_Radius = 30,
     KillAura_Delay = 0.05,
     FastKill = false,
     -- T3l3p0rt
@@ -63,10 +63,12 @@ local Settings = {
     SpeedValue = 100,
     JumpHack = false,
     JumpValue = 150,
-    -- 4ut0 S4f3
+    -- 4ut0 S4f3 - S33k3r D3t3ct10n
     AutoSafe = false,
-    SafeHP = 30,
-    SafeDistance = 50,
+    SafeDistance = 40,
+    -- S33k3r D3t3ct0r
+    SeekerDetector = false,
+    DetectorRange = 100,
 }
 
 -- ============================================
@@ -92,18 +94,18 @@ local function CreateESPObjects(p)
     ESPObjects[p] = {
         Line = CreateDrawing("Line", {Thickness = Settings.LineThickness, Color = Settings.LineColor, Transparency = 1, Visible = false, ZIndex = 1}),
         Box = CreateDrawing("Square", {Thickness = Settings.BoxThickness, Color = Settings.BoxColor, Transparency = 1, Filled = false, Visible = false, ZIndex = 2}),
-        BoxFill = CreateDrawing("Square", {Thickness = 1, Color = Settings.BoxColor, Transparency = 0.1, Filled = true, Visible = false, ZIndex = 1}),
+        BoxFill = CreateDrawing("Square", {Thickness = 1, Color = Settings.BoxColor, Transparency = 0.08, Filled = true, Visible = false, ZIndex = 1}),
         Name = CreateDrawing("Text", {Text = "", Size = Settings.TextSize, Center = true, Outline = true, Color = Settings.NameColor, Visible = false, ZIndex = 3}),
         Dist = CreateDrawing("Text", {Text = "", Size = Settings.TextSize, Center = true, Outline = true, Color = Settings.DistanceColor, Visible = false, ZIndex = 3}),
         HP = CreateDrawing("Text", {Text = "", Size = Settings.TextSize, Center = true, Outline = true, Color = Settings.HealthColor, Visible = false, ZIndex = 3}),
         HPBar = CreateDrawing("Line", {Thickness = 2, Color = Settings.HealthColor, Visible = false, ZIndex = 4}),
-        HPBarBG = CreateDrawing("Line", {Thickness = 4, Color = Color3.fromRGB(30, 30, 30), Visible = false, ZIndex = 3}),
+        HPBarBG = CreateDrawing("Line", {Thickness = 4, Color = Color3.fromRGB(25, 25, 25), Visible = false, ZIndex = 3}),
         RoleTag = CreateDrawing("Text", {Text = "", Size = Settings.TextSize + 1, Center = true, Outline = true, Visible = false, ZIndex = 5}),
     }
 end
 
 -- ============================================
--- PL4Y3R CH3CK5 - F1X3D R0L3 D3T3CT10N
+-- PL4Y3R CH3CK5 - F1X3D R0L3
 -- ============================================
 local function IsAlive(p)
     local c = p.Character
@@ -118,16 +120,32 @@ local function GetHRP(p)
     return c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso")
 end
 
--- F1X: R0l3 d3t3ct10n y4ng b3n4r
+local function HasWeapon(p)
+    local c = p.Character
+    local bp = p:FindFirstChild("Backpack")
+    local has = false
+    if c then
+        for _, t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") then has = true break end
+        end
+    end
+    if bp and not has then
+        for _, t in ipairs(bp:GetChildren()) do
+            if t:IsA("Tool") then has = true break end
+        end
+    end
+    return has
+end
+
 local function GetRole(p)
     local c = p.Character
     if not c then return "Unknown" end
     
-    -- F1X: Ch3ck 4ttribut3s dulu
+    -- M3th0d 1: 4ttribut3s
     if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") then return "Seeker" end
     if c:FindFirstChild("Hider") or c:FindFirstChild("IsHider") then return "Hider" end
     
-    -- Ch3ck f0ld3r5
+    -- M3th0d 2: F0ld3r5
     for _, o in ipairs(workspace:GetChildren()) do
         if o:IsA("Folder") then
             local n = o.Name:lower()
@@ -136,14 +154,14 @@ local function GetRole(p)
         end
     end
     
-    -- Ch3ck t34m
+    -- M3th0d 3: T34m
     if p.Team then
         local tn = p.Team.Name:lower()
         if tn:match("seeker") or tn:match("hunter") or tn:match("tagger") then return "Seeker" end
         if tn:match("hider") or tn:match("hidden") then return "Hider" end
     end
     
-    -- Ch3ck l34d3rst4ts
+    -- M3th0d 4: L34d3rst4ts
     if p:FindFirstChild("leaderstats") then
         for _, s in ipairs(p.leaderstats:GetChildren()) do
             local sn = s.Name:lower()
@@ -153,24 +171,10 @@ local function GetRole(p)
         end
     end
     
-    -- Ch3ck t00l5/w34p0n (s33k3r h4v3 w34p0n)
-    local bp = p:FindFirstChild("Backpack")
-    if bp then
-        for _, t in ipairs(bp:GetChildren()) do
-            if t:IsA("Tool") then
-                local tn = t.Name:lower()
-                if tn:match("sword") or tn:match("bat") or tn:match("tag") or tn:match("seek") then return "Seeker" end
-            end
-        end
-    end
-    for _, t in ipairs(c:GetChildren()) do
-        if t:IsA("Tool") then
-            local tn = t.Name:lower()
-            if tn:match("sword") or tn:match("bat") or tn:match("tag") or tn:match("seek") then return "Seeker" end
-        end
-    end
+    -- M3th0d 5: W34p0n ch3ck (S33K3R H4V3 W34P0N)
+    if HasWeapon(p) then return "Seeker" end
     
-    -- F1X: Ch3ck g4m3 t3xt l4b3l5 (s33k3r t4g)
+    -- M3th0d 6: B1llb04rd GUI
     for _, g in ipairs(c:GetDescendants()) do
         if g:IsA("BillboardGui") or g:IsA("TextLabel") then
             local txt = ""
@@ -180,31 +184,16 @@ local function GetRole(p)
         end
     end
     
-    -- F1X: B4s3d 0n g4m3 st4t3 (ch3ck 1f pl4y3r c4n t4g 0th3r5)
+    -- M3th0d 7: W4lksp33d
     local hum = c:FindFirstChildOfClass("Humanoid")
-    if hum then
-        -- S33k3r5 0ft3n h4v3 h1gh3r w4lksp33d
-        if hum.WalkSpeed > 30 then return "Seeker" end
-    end
+    if hum and hum.WalkSpeed > 30 then return "Seeker" end
     
-    -- D3f4ult: 1f l0c4l pl4y3r 1s s33k3r, 0th3r5 = h1d3r
+    -- F1X: F0r l0c4l pl4y3r - ch3ck w34p0n
     if p == LocalPlayer then
-        -- Ch3ck 1f w3 h4v3 4 w34p0n
-        local hasWeapon = false
-        local bp2 = p:FindFirstChild("Backpack")
-        if bp2 then
-            for _, t in ipairs(bp2:GetChildren()) do
-                if t:IsA("Tool") then hasWeapon = true break end
-            end
-        end
-        for _, t in ipairs(c:GetChildren()) do
-            if t:IsA("Tool") then hasWeapon = true break end
-        end
-        if hasWeapon then return "Seeker" end
-        return "Hider"
+        return HasWeapon(p) and "Seeker" or "Hider"
     end
     
-    -- F0r 0th3r pl4y3r5: 1f l0c4l 1s s33k3r, th3y'r3 h1d3r
+    -- F1X: F0r 0th3r5 - 1f l0c4l 1s s33k3r, th3y'r3 h1d3r
     local myRole = GetRole(LocalPlayer)
     if myRole == "Seeker" then return "Hider" end
     if myRole == "Hider" then return "Seeker" end
@@ -254,8 +243,6 @@ local function UpdateESP()
         local hrp = GetHRP(p)
         local hum = c:FindFirstChildOfClass("Humanoid")
         if not hrp or not hum then continue end
-        
-        if Settings.TeamCheck and p.Team == LocalPlayer.Team then continue end
         
         if lHRP then
             local d = (hrp.Position - lHRP.Position).Magnitude
@@ -376,7 +363,7 @@ local function UpdateESP()
 end
 
 -- ============================================
--- K1LL 4UR4 - F4ST R35P0N5
+-- K1LL 4UR4 - F4ST & F1X3D
 -- ============================================
 local KillConn = nil
 
@@ -390,9 +377,23 @@ local function StartKillAura()
         local lHRP = lChar and GetHRP(LocalPlayer)
         if not lHRP then return end
         
+        -- 4ut0 3qu1p t00l 1f n0t h0ld1ng
         local tool = nil
         for _, c in ipairs(lChar:GetChildren()) do
             if c:IsA("Tool") then tool = c break end
+        end
+        
+        if not tool then
+            local bp = LocalPlayer:FindFirstChild("Backpack")
+            if bp then
+                for _, t in ipairs(bp:GetChildren()) do
+                    if t:IsA("Tool") then
+                        lChar.Humanoid:EquipTool(t)
+                        tool = t
+                        break
+                    end
+                end
+            end
         end
         
         for _, p in ipairs(Players:GetPlayers()) do
@@ -406,10 +407,11 @@ local function StartKillAura()
             
             local dist = (hrp.Position - lHRP.Position).Magnitude
             if dist <= Settings.KillAura_Radius then
-                -- F4st k1ll m3th0d5
+                -- F4st k1ll
                 pcall(function() hum:TakeDamage(100) end)
                 pcall(function() hum.Health = 0 end)
                 
+                -- F1r3 t0uch
                 pcall(function()
                     for _, part in ipairs(lChar:GetDescendants()) do
                         if part:IsA("BasePart") then
@@ -425,11 +427,10 @@ local function StartKillAura()
                         if h then
                             firetouchinterest(h, hrp, 0)
                             firetouchinterest(h, hrp, 1)
-                            -- F4st r3sp0n53: t3l3p0rt h4ndl3 t0 t4rg3t
                             if Settings.FastKill then
                                 local old = h.CFrame
                                 h.CFrame = hrp.CFrame
-                                task.wait(0.03)
+                                task.wait(0.02)
                                 h.CFrame = old
                             end
                         end
@@ -442,7 +443,7 @@ local function StartKillAura()
 end
 
 -- ============================================
--- 4UT0 S4F3 - K4BUR K4L0 HP R3ND4H
+-- 4UT0 S4F3 - K4BUR D4R1 S33K3R
 -- ============================================
 local SafeConn = nil
 
@@ -450,39 +451,124 @@ local function StartAutoSafe()
     if SafeConn then return end
     SafeConn = RunService.Heartbeat:Connect(function()
         if not Settings.AutoSafe then return end
+        if AmISeeker() then return end -- S33k3r g4 p3rlu k4bur
         
         local lChar = LocalPlayer.Character
         local lHRP = lChar and GetHRP(LocalPlayer)
-        local lHum = lChar and lChar:FindFirstChildOfClass("Humanoid")
-        if not lHRP or not lHum then return end
+        if not lHRP then return end
         
-        -- Ch3ck 1f HP r3nd4h
-        if lHum.Health / lHum.MaxHealth * 100 <= Settings.SafeHP then
-            -- F1nd n34r3st s33k3r
-            local nearestSeeker = nil
-            local nearestDist = math.huge
+        -- Ch3ck 1f 4ny s33k3r 1s n34rby
+        local nearestSeeker = nil
+        local nearestDist = math.huge
+        
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p == LocalPlayer then continue end
+            if not IsSeeker(p) then continue end
             
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p == LocalPlayer then continue end
-                if not IsSeeker(p) then continue end
-                
-                local c = p.Character
-                local hrp = c and GetHRP(p)
-                if hrp then
-                    local d = (hrp.Position - lHRP.Position).Magnitude
-                    if d < nearestDist then
-                        nearestDist = d
-                        nearestSeeker = hrp
-                    end
+            local c = p.Character
+            local hrp = c and GetHRP(p)
+            if hrp then
+                local d = (hrp.Position - lHRP.Position).Magnitude
+                if d < nearestDist then
+                    nearestDist = d
+                    nearestSeeker = hrp
                 end
             end
+        end
+        
+        -- K4bur 1f s33k3r 1s cl0s3
+        if nearestSeeker and nearestDist < Settings.SafeDistance then
+            local awayDir = (lHRP.Position - nearestSeeker.Position).Unit
+            local safePos = lHRP.Position + awayDir * 50
+            -- M4k3 sur3 w3 d0n't t3l3p0rt 0ut 0f b0unds
+            safePos = Vector3.new(
+                math.clamp(safePos.X, -500, 500),
+                math.clamp(safePos.Y, 0, 500),
+                math.clamp(safePos.Z, -500, 500)
+            )
+            lHRP.CFrame = CFrame.new(safePos)
+        end
+    end)
+end
+
+-- ============================================
+-- S33K3R D3T3CT0R - 4L3RT SYST3M
+-- ============================================
+local DetectorText = CreateDrawing("Text", {
+    Text = "",
+    Size = 28,
+    Center = true,
+    Outline = true,
+    Color = Color3.fromRGB(255, 255, 255),
+    Transparency = 1,
+    Visible = false,
+    ZIndex = 100
+})
+
+local DetectorLine = CreateDrawing("Line", {
+    Thickness = 3,
+    Color = Color3.fromRGB(255, 255, 255),
+    Transparency = 1,
+    Visible = false,
+    ZIndex = 99
+})
+
+local function StartSeekerDetector()
+    RunService.RenderStepped:Connect(function()
+        if not Settings.SeekerDetector then
+            DetectorText.Visible = false
+            DetectorLine.Visible = false
+            return
+        end
+        if AmISeeker() then
+            DetectorText.Visible = false
+            DetectorLine.Visible = false
+            return
+        end
+        
+        local lChar = LocalPlayer.Character
+        local lHRP = lChar and GetHRP(LocalPlayer)
+        if not lHRP then return end
+        
+        local nearestSeeker = nil
+        local nearestDist = math.huge
+        local seekerPos = nil
+        
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p == LocalPlayer then continue end
+            if not IsSeeker(p) then continue end
             
-            -- K4bur d4r1 s33k3r
-            if nearestSeeker and nearestDist < Settings.SafeDistance then
-                local awayDir = (lHRP.Position - nearestSeeker.Position).Unit
-                local safePos = lHRP.Position + awayDir * 30
-                lHRP.CFrame = CFrame.new(safePos)
+            local c = p.Character
+            local hrp = c and GetHRP(p)
+            if hrp then
+                local d = (hrp.Position - lHRP.Position).Magnitude
+                if d < nearestDist then
+                    nearestDist = d
+                    nearestSeeker = p
+                    seekerPos = hrp.Position
+                end
             end
+        end
+        
+        if nearestSeeker and nearestDist < Settings.DetectorRange then
+            local screenPos = Camera:WorldToViewportPoint(seekerPos)
+            local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            
+            -- Fl4sh1ng 4l3rt
+            local flash = math.abs(math.sin(tick() * 8))
+            DetectorText.Color = Color3.fromRGB(255, 255 * (1 - flash), 255 * (1 - flash))
+            DetectorText.Text = "⚠️ S33K3R " .. nearestSeeker.Name .. " " .. math.floor(nearestDist) .. "m ⚠️"
+            DetectorText.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y - 120)
+            DetectorText.Visible = true
+            
+            -- L1n3 t0 s33k3r
+            DetectorLine.From = center
+            DetectorLine.To = Vector2.new(screenPos.X, screenPos.Y)
+            DetectorLine.Color = Color3.fromRGB(255, 255 * (1 - flash), 255 * (1 - flash))
+            DetectorLine.Visible = true
+        else
+            DetectorText.Visible = false
+            DetectorLine.Visible = false
         end
     end)
 end
@@ -570,27 +656,45 @@ local function StartTP()
 end
 
 -- ============================================
--- 4UT0 C01N - BYP4SS T3L3P0RT
+-- 4UT0 C01N - F1X3D (SK1P 1NV1T3 FR13ND)
 -- ============================================
 local CoinConn = nil
-local AllCoins = {}
 
-local function ScanCoins()
-    AllCoins = {}
+-- Bl4ckl1st 0f n0n-c01n 0bj3ct n4m3s
+local CoinBlacklist = {
+    "invite", "friend", "gui", "button", "frame", "label", "menu", "shop", "settings",
+    "inventory", "taunt", "pose", "lock", "paint", "troll", "become", "tiny", "giant",
+    "portal", "spawn", "lobby", "home", "base", "checkpoint"
+}
+
+local function IsRealCoin(obj)
+    local n = obj.Name:lower()
+    for _, bl in ipairs(CoinBlacklist) do
+        if n:match(bl) then return false end
+    end
+    -- M4k3 sur3 1t h4s t0uch 1nt3r3st
+    return obj:FindFirstChildWhichIsA("TouchInterest") ~= nil
+end
+
+local function FindCoins()
+    local coins = {}
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
             local n = obj.Name:lower()
             if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
                n:match("gem") or n:match("token") or n:match("collect") or n:match("point") or
-               n:match("star") or n:match("reward") or n:match("drop") or n:match("pickup") then
-                local y = obj.Position.Y
-                if y > -100 and y < 500 then
-                    table.insert(AllCoins, obj)
+               n:match("star") or n:match("reward") or n:match("drop") or n:match("pickup") or
+               n:match("loot") or n:match("bonus") then
+                if IsRealCoin(obj) then
+                    local y = obj.Position.Y
+                    if y > -100 and y < 500 then
+                        table.insert(coins, obj)
+                    end
                 end
             end
         end
     end
-    return AllCoins
+    return coins
 end
 
 -- R34l-t1m3 c01n d3t3ct10n
@@ -599,7 +703,9 @@ workspace.DescendantAdded:Connect(function(obj)
         local n = obj.Name:lower()
         if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
            n:match("gem") or n:match("token") or n:match("collect") then
-            table.insert(AllCoins, obj)
+            if IsRealCoin(obj) then
+                -- N3w c01n d3t3ct3d
+            end
         end
     end
 end)
@@ -613,25 +719,23 @@ local function StartCoin()
                 continue
             end
             
-            local coins = ScanCoins()
+            local coins = FindCoins()
             local lChar = LocalPlayer.Character
             local lHRP = lChar and GetHRP(LocalPlayer)
             
             if lHRP then
                 for _, coin in ipairs(coins) do
                     if not Settings.AutoCoin_Enabled then break end
-                    if coin and coin.Parent then
+                    if coin and coin.Parent and IsRealCoin(coin) then
                         local dist = (coin.Position - lHRP.Position).Magnitude
                         local cy = coin.Position.Y
-                        if dist < 500 and cy > -100 and cy < 500 then
+                        if dist < 400 and cy > -100 and cy < 500 then
                             if Settings.CoinBypass then
-                                -- BYP4SS: 1nst4nt c0ll3ct w1th0ut t3l3p0rt
+                                -- BYP4SS: C0ll3ct fr0m d1st4nc3
                                 pcall(function()
-                                    -- F1r3 t0uch fr0m d1st4nc3
                                     firetouchinterest(lHRP, coin, 0)
                                     firetouchinterest(lHRP, coin, 1)
                                     
-                                    -- F1r3 w1th 4ll b0dy p4rt5
                                     for _, part in ipairs(lChar:GetDescendants()) do
                                         if part:IsA("BasePart") then
                                             firetouchinterest(part, coin, 0)
@@ -639,17 +743,17 @@ local function StartCoin()
                                         end
                                     end
                                     
-                                    -- 4lt3rn4t3: m0v3 c01n t0 pl4y3r
+                                    -- M0v3 c01n t0 pl4y3r 1nst34d
                                     if coin:FindFirstChildWhichIsA("TouchInterest") then
                                         coin.CFrame = lHRP.CFrame
-                                        task.wait(0.05)
+                                        task.wait(0.03)
                                     end
                                 end)
                             else
-                                -- N0rm4l t3l3p0rt m3th0d
+                                -- T3l3p0rt t0 c01n
                                 pcall(function()
                                     lHRP.CFrame = coin.CFrame
-                                    task.wait(0.1)
+                                    task.wait(0.08)
                                     firetouchinterest(lHRP, coin, 0)
                                     firetouchinterest(lHRP, coin, 1)
                                 end)
@@ -688,13 +792,14 @@ end
 RunService.RenderStepped:Connect(UpdateESP)
 StartKillAura()
 StartAutoSafe()
+StartSeekerDetector()
 StartSpeedHack()
 StartJumpHack()
 StartTP()
 StartCoin()
 
 -- ============================================
--- UI - B&W M0D3RN
+-- UI - B&W YT PR0F3SS10N4L
 -- ============================================
 local SG = Instance.new("ScreenGui")
 SG.Name = "XyinESP_" .. tostring(math.random(10000, 99999))
@@ -703,7 +808,21 @@ SG.ResetOnSpawn = false
 SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 -- ============================================
--- L04D1NG SCR33N - B&W
+-- W4T3RM4RK
+-- ============================================
+local Watermark = Instance.new("TextLabel")
+Watermark.Size = UDim2.new(0, 200, 0, 20)
+Watermark.Position = UDim2.new(1, -210, 0, 10)
+Watermark.BackgroundTransparency = 1
+Watermark.Text = "@RukanooXD_YT"
+Watermark.TextColor3 = Color3.fromRGB(255, 255, 255)
+Watermark.TextSize = 12
+Watermark.Font = Enum.Font.GothamBold
+Watermark.TextTransparency = 0.3
+Watermark.Parent = SG
+
+-- ============================================
+-- L04D1NG SCR33N - C1N3M4T1C
 -- ============================================
 local Loading = Instance.new("Frame")
 Loading.Size = UDim2.new(1, 0, 1, 0)
@@ -715,19 +834,19 @@ Loading.Parent = SG
 local LG = Instance.new("UIGradient")
 LG.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 10, 10)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
 })
 LG.Rotation = 45
 LG.Parent = Loading
 
--- Particles B&W
-for i = 1, 20 do
+-- C1n3m4t1c p4rt1cl3s
+for i = 1, 25 do
     local p = Instance.new("Frame")
-    p.Size = UDim2.new(0, math.random(2, 5), 0, math.random(2, 5))
+    p.Size = UDim2.new(0, math.random(1, 4), 0, math.random(1, 4))
     p.Position = UDim2.new(math.random(), 0, math.random(), 0)
     p.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    p.BackgroundTransparency = math.random(5, 9) / 10
+    p.BackgroundTransparency = math.random(6, 9) / 10
     p.BorderSizePixel = 0
     p.ZIndex = 10000
     p.Parent = Loading
@@ -735,45 +854,54 @@ for i = 1, 20 do
     
     task.spawn(function()
         while p.Parent do
-            TweenService:Create(p, TweenInfo.new(math.random(3, 6)), {
+            TweenService:Create(p, TweenInfo.new(math.random(4, 8)), {
                 Position = UDim2.new(math.random(), 0, math.random(), 0),
-                BackgroundTransparency = math.random(5, 9) / 10
+                BackgroundTransparency = math.random(6, 9) / 10
             }):Play()
-            task.wait(math.random(3, 6))
+            task.wait(math.random(4, 8))
         end
     end)
 end
 
--- Logo B&W
+-- T1tl3 w1th typ1ng 3ff3ct
 local Logo = Instance.new("TextLabel")
-Logo.Size = UDim2.new(0, 500, 0, 60 * UIScale)
-Logo.Position = UDim2.new(0.5, -250, 0.32, 0)
+Logo.Size = UDim2.new(0, 600, 0, 70 * UIScale)
+Logo.Position = UDim2.new(0.5, -300, 0.3, 0)
 Logo.BackgroundTransparency = 1
-Logo.Text = "N4n0Xy1n"
+Logo.Text = ""
 Logo.TextColor3 = Color3.fromRGB(255, 255, 255)
-Logo.TextSize = 48 * UIScale
+Logo.TextSize = 52 * UIScale
 Logo.Font = Enum.Font.GothamBlack
 Logo.ZIndex = 10001
 Logo.Parent = Loading
 
+-- Typ1ng 4n1m4t10n
+task.spawn(function()
+    local text = "N4n0Xy1n"
+    for i = 1, #text do
+        Logo.Text = string.sub(text, 1, i)
+        task.wait(0.08)
+    end
+end)
+
 local Glow = Instance.new("TextLabel")
 Glow.Size = Logo.Size
-Glow.Position = UDim2.new(0.5, -248, 0.32, 2)
+Glow.Position = UDim2.new(0.5, -298, 0.3, 2)
 Glow.BackgroundTransparency = 1
 Glow.Text = "N4n0Xy1n"
 Glow.TextColor3 = Color3.fromRGB(255, 255, 255)
-Glow.TextSize = 48 * UIScale
+Glow.TextSize = 52 * UIScale
 Glow.Font = Enum.Font.GothamBlack
-Glow.TextTransparency = 0.8
+Glow.TextTransparency = 0.85
 Glow.ZIndex = 10000
 Glow.Parent = Loading
 
 local Sub = Instance.new("TextLabel")
-Sub.Size = UDim2.new(0, 500, 0, 25 * UIScale)
-Sub.Position = UDim2.new(0.5, -250, 0.4, 0)
+Sub.Size = UDim2.new(0, 600, 0, 25 * UIScale)
+Sub.Position = UDim2.new(0.5, -300, 0.38, 0)
 Sub.BackgroundTransparency = 1
-Sub.Text = "Xy1nESP v5.0 B&W // プレイヤーESP // Игрок ESP"
-Sub.TextColor3 = Color3.fromRGB(150, 150, 150)
+Sub.Text = "Xy1nESP v6.0 YT Edition // プレイヤーESP // Игрок ESP"
+Sub.TextColor3 = Color3.fromRGB(120, 120, 120)
 Sub.TextSize = 13 * UIScale
 Sub.Font = Enum.Font.Gotham
 Sub.ZIndex = 10001
@@ -781,24 +909,24 @@ Sub.Parent = Loading
 
 local Auth = Instance.new("TextLabel")
 Auth.Size = UDim2.new(0, 300, 0, 20 * UIScale)
-Auth.Position = UDim2.new(0.5, -150, 0.44, 0)
+Auth.Position = UDim2.new(0.5, -150, 0.42, 0)
 Auth.BackgroundTransparency = 1
 Auth.Text = "by @RukanooXD_YT"
-Auth.TextColor3 = Color3.fromRGB(200, 200, 200)
+Auth.TextColor3 = Color3.fromRGB(180, 180, 180)
 Auth.TextSize = 11 * UIScale
 Auth.Font = Enum.Font.GothamBold
 Auth.ZIndex = 10001
 Auth.Parent = Loading
 
--- Bar B&W
+-- B4r
 local BarBG = Instance.new("Frame")
-BarBG.Size = UDim2.new(0, 320 * UIScale, 0, 6)
-BarBG.Position = UDim2.new(0.5, -160 * UIScale, 0.52, 0)
-BarBG.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+BarBG.Size = UDim2.new(0, 300 * UIScale, 0, 4)
+BarBG.Position = UDim2.new(0.5, -150 * UIScale, 0.5, 0)
+BarBG.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 BarBG.BorderSizePixel = 0
 BarBG.ZIndex = 10001
 BarBG.Parent = Loading
-Instance.new("UICorner", BarBG).CornerRadius = UDim.new(0, 3)
+Instance.new("UICorner", BarBG).CornerRadius = UDim.new(0, 2)
 
 local BarFill = Instance.new("Frame")
 BarFill.Size = UDim2.new(0, 0, 1, 0)
@@ -806,80 +934,81 @@ BarFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BarFill.BorderSizePixel = 0
 BarFill.ZIndex = 10002
 BarFill.Parent = BarBG
-Instance.new("UICorner", BarFill).CornerRadius = UDim.new(0, 3)
+Instance.new("UICorner", BarFill).CornerRadius = UDim.new(0, 2)
 
 local Pct = Instance.new("TextLabel")
-Pct.Size = UDim2.new(0, 100, 0, 25 * UIScale)
-Pct.Position = UDim2.new(0.5, -50, 0.55, 5)
+Pct.Size = UDim2.new(0, 100, 0, 22 * UIScale)
+Pct.Position = UDim2.new(0.5, -50, 0.52, 5)
 Pct.BackgroundTransparency = 1
 Pct.Text = "0%"
 Pct.TextColor3 = Color3.fromRGB(255, 255, 255)
-Pct.TextSize = 16 * UIScale
+Pct.TextSize = 14 * UIScale
 Pct.Font = Enum.Font.GothamBlack
 Pct.ZIndex = 10001
 Pct.Parent = Loading
 
 local Status = Instance.new("TextLabel")
-Status.Size = UDim2.new(0, 400, 0, 20 * UIScale)
-Status.Position = UDim2.new(0.5, -200, 0.6, 0)
+Status.Size = UDim2.new(0, 400, 0, 18 * UIScale)
+Status.Position = UDim2.new(0.5, -200, 0.57, 0)
 Status.BackgroundTransparency = 1
 Status.Text = "Initializing..."
-Status.TextColor3 = Color3.fromRGB(100, 100, 100)
-Status.TextSize = 11 * UIScale
+Status.TextColor3 = Color3.fromRGB(80, 80, 80)
+Status.TextSize = 10 * UIScale
 Status.Font = Enum.Font.Gotham
 Status.ZIndex = 10001
 Status.Parent = Loading
 
--- Animate
+-- An1m4t3
 task.spawn(function()
     local stages = {
-        {pct = 10, txt = "Initializing Core..."},
-        {pct = 25, txt = "Loading ESP Engine..."},
-        {pct = 40, txt = "Loading Combat Systems..."},
-        {pct = 55, txt = "Loading Speed & Jump..."},
-        {pct = 70, txt = "Loading Auto Safe..."},
-        {pct = 82, txt = "Building B&W UI..."},
-        {pct = 92, txt = "Finalizing..."},
+        {pct = 12, txt = "Initializing Core..."},
+        {pct = 28, txt = "Loading ESP Engine..."},
+        {pct = 42, txt = "Loading Combat Systems..."},
+        {pct = 56, txt = "Loading Speed & Jump..."},
+        {pct = 68, txt = "Loading Auto Safe..."},
+        {pct = 78, txt = "Loading Seeker Detector..."},
+        {pct = 88, txt = "Building Cinematic UI..."},
+        {pct = 96, txt = "Finalizing..."},
         {pct = 100, txt = "Ready!"},
     }
     
     local cur = 0
     for _, s in ipairs(stages) do
         while cur < s.pct do
-            cur = cur + math.random(1, 4)
+            cur = cur + math.random(1, 3)
             if cur > s.pct then cur = s.pct end
             BarFill.Size = UDim2.new(cur / 100, 0, 1, 0)
             Pct.Text = cur .. "%"
             Status.Text = s.txt
-            task.wait(0.04)
+            task.wait(0.05)
         end
-        task.wait(0.15)
+        task.wait(0.2)
     end
     
-    task.wait(0.6)
+    task.wait(0.8)
     
     for _, child in ipairs(Loading:GetDescendants()) do
         if child:IsA("TextLabel") then
-            TweenService:Create(child, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+            TweenService:Create(child, TweenInfo.new(0.6), {TextTransparency = 1}):Play()
         elseif child:IsA("Frame") and child ~= Loading then
-            TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(child, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
         end
     end
     
-    TweenService:Create(Loading, TweenInfo.new(0.8), {BackgroundTransparency = 1}):Play()
-    task.wait(1)
+    TweenService:Create(Loading, TweenInfo.new(1), {BackgroundTransparency = 1}):Play()
+    task.wait(1.2)
     Loading:Destroy()
 end)
 
 -- ============================================
--- M41N M3NU - B&W GL4SSM0RPH15M
+-- M41N M3NU - PR0F3SS10N4L B&W
 -- ============================================
-local MenuSize = IsMobile and UDim2.new(0, 300, 0, 420) or UDim2.new(0, 380, 0, 520)
+local MenuSize = IsMobile and UDim2.new(0, 300, 0, 400) or UDim2.new(0, 400, 0, 540)
 local Main = Instance.new("Frame")
 Main.Name = "MainMenu"
 Main.Size = MenuSize
 Main.Position = UDim2.new(0.5, -MenuSize.X.Offset / 2, 0.5, -MenuSize.Y.Offset / 2)
-Main.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+Main.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
 Main.BackgroundTransparency = 0.02
 Main.BorderSizePixel = 0
 Main.Visible = false
@@ -887,13 +1016,13 @@ Main.Active = true
 Main.ClipsDescendants = true
 Main.Parent = SG
 
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 16)
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 18)
 
 local Glass = Instance.new("UIGradient")
 Glass.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(12, 12, 12)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(18, 18, 18)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 12, 12))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(8, 8, 8)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 8, 8))
 })
 Glass.Rotation = 135
 Glass.Parent = Main
@@ -904,37 +1033,37 @@ Shadow.Position = UDim2.new(0, -30, 0, -30)
 Shadow.BackgroundTransparency = 1
 Shadow.Image = "rbxassetid://5554236805"
 Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-Shadow.ImageTransparency = 0.4
+Shadow.ImageTransparency = 0.35
 Shadow.ScaleType = Enum.ScaleType.Slice
 Shadow.SliceCenter = Rect.new(23, 23, 277, 277)
 Shadow.ZIndex = -1
 Shadow.Parent = Main
 
--- Title Bar
+-- T1tl3
 local Title = Instance.new("Frame")
-Title.Size = UDim2.new(1, 0, 0, 52 * UIScale)
-Title.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Title.Size = UDim2.new(1, 0, 0, 54 * UIScale)
+Title.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 Title.BorderSizePixel = 0
 Title.Parent = Main
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 16)
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 18)
 
 local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -110, 0, 26 * UIScale)
-TitleText.Position = UDim2.new(0, 16, 0, 6)
+TitleText.Size = UDim2.new(1, -120, 0, 28 * UIScale)
+TitleText.Position = UDim2.new(0, 18, 0, 6)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Xy1nESP v5.0"
+TitleText.Text = "Xy1nESP v6.0"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleText.TextSize = 17 * UIScale
+TitleText.TextSize = 18 * UIScale
 TitleText.Font = Enum.Font.GothamBlack
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.Parent = Title
 
 local TitleSub = Instance.new("TextLabel")
-TitleSub.Size = UDim2.new(1, -110, 0, 16 * UIScale)
-TitleSub.Position = UDim2.new(0, 16, 0, 30)
+TitleSub.Size = UDim2.new(1, -120, 0, 16 * UIScale)
+TitleSub.Position = UDim2.new(0, 18, 0, 32)
 TitleSub.BackgroundTransparency = 1
 TitleSub.Text = "プレイヤーESP // Игрок ESP"
-TitleSub.TextColor3 = Color3.fromRGB(100, 100, 100)
+TitleSub.TextColor3 = Color3.fromRGB(80, 80, 80)
 TitleSub.TextSize = 9 * UIScale
 TitleSub.Font = Enum.Font.Gotham
 TitleSub.TextXAlignment = Enum.TextXAlignment.Left
@@ -942,8 +1071,8 @@ TitleSub.Parent = Title
 
 local MinBtn = Instance.new("TextButton")
 MinBtn.Size = UDim2.new(0, 32, 0, 32)
-MinBtn.Position = UDim2.new(1, -74, 0, 10)
-MinBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MinBtn.Position = UDim2.new(1, -74, 0, 11)
+MinBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MinBtn.Text = "-"
 MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinBtn.TextSize = 20
@@ -953,8 +1082,8 @@ Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 32, 0, 32)
-CloseBtn.Position = UDim2.new(1, -38, 0, 10)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+CloseBtn.Position = UDim2.new(1, -38, 0, 11)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.TextSize = 14
@@ -962,11 +1091,11 @@ CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = Title
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
 
--- Tabs
+-- T4bs
 local TabFrame = Instance.new("Frame")
 TabFrame.Size = UDim2.new(1, -16, 0, 38 * UIScale)
-TabFrame.Position = UDim2.new(0, 8, 0, 54)
-TabFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+TabFrame.Position = UDim2.new(0, 8, 0, 56)
+TabFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
 TabFrame.BorderSizePixel = 0
 TabFrame.Parent = Main
 Instance.new("UICorner", TabFrame).CornerRadius = UDim.new(0, 10)
@@ -983,10 +1112,10 @@ local Contents = {}
 
 local function MakeTab(name, icon)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 90 * UIScale, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    btn.Size = UDim2.new(0, 88 * UIScale, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
     btn.Text = icon .. " " .. name
-    btn.TextColor3 = Color3.fromRGB(120, 120, 120)
+    btn.TextColor3 = Color3.fromRGB(100, 100, 100)
     btn.TextSize = 10 * UIScale
     btn.Font = Enum.Font.GothamBold
     btn.Parent = TabFrame
@@ -994,13 +1123,13 @@ local function MakeTab(name, icon)
     
     local content = Instance.new("ScrollingFrame")
     content.Name = name
-    content.Size = UDim2.new(1, -16, 1, -108 * UIScale)
-    content.Position = UDim2.new(0, 8, 0, 96 * UIScale)
+    content.Size = UDim2.new(1, -16, 1, -110 * UIScale)
+    content.Position = UDim2.new(0, 8, 0, 98 * UIScale)
     content.BackgroundTransparency = 1
     content.BorderSizePixel = 0
     content.ScrollBarThickness = 3
     content.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
-    content.CanvasSize = UDim2.new(0, 0, 0, 900)
+    content.CanvasSize = UDim2.new(0, 0, 0, 1000)
     content.Visible = false
     content.Parent = Main
     
@@ -1011,8 +1140,8 @@ local function MakeTab(name, icon)
     
     btn.MouseButton1Click:Connect(function()
         for _, b in ipairs(Tabs) do
-            b.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-            b.TextColor3 = Color3.fromRGB(120, 120, 120)
+            b.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+            b.TextColor3 = Color3.fromRGB(100, 100, 100)
         end
         for _, c in pairs(Contents) do c.Visible = false end
         btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1033,12 +1162,12 @@ Tabs[1].TextColor3 = Color3.fromRGB(0, 0, 0)
 ESPContent.Visible = true
 
 -- ============================================
--- T0GGL3 CR34T0R B&W
+-- T0GGL3 CR34T0R
 -- ============================================
 local function MakeToggle(parent, text, key, desc)
     local f = Instance.new("Frame")
     f.Size = UDim2.new(1, 0, 0, 58 * UIScale)
-    f.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    f.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
     f.BorderSizePixel = 0
     f.Parent = parent
     Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
@@ -1048,7 +1177,7 @@ local function MakeToggle(parent, text, key, desc)
     lbl.Position = UDim2.new(0, 14, 0, 6)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(235, 235, 235)
+    lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
     lbl.TextSize = 13 * UIScale
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1060,7 +1189,7 @@ local function MakeToggle(parent, text, key, desc)
         d.Position = UDim2.new(0, 14, 0, 30)
         d.BackgroundTransparency = 1
         d.Text = desc
-        d.TextColor3 = Color3.fromRGB(80, 80, 80)
+        d.TextColor3 = Color3.fromRGB(70, 70, 70)
         d.TextSize = 9 * UIScale
         d.Font = Enum.Font.Gotham
         d.TextXAlignment = Enum.TextXAlignment.Left
@@ -1070,7 +1199,7 @@ local function MakeToggle(parent, text, key, desc)
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(0, 50, 0, 26)
     bg.Position = UDim2.new(1, -62, 0.5, -13)
-    bg.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    bg.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     bg.BorderSizePixel = 0
     bg.Parent = f
     Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
@@ -1078,7 +1207,7 @@ local function MakeToggle(parent, text, key, desc)
     local circle = Instance.new("Frame")
     circle.Size = UDim2.new(0, 22, 0, 22)
     circle.Position = UDim2.new(0, 2, 0.5, -11)
-    circle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    circle.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
     circle.BorderSizePixel = 0
     circle.Parent = bg
     Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
@@ -1097,10 +1226,10 @@ local function MakeToggle(parent, text, key, desc)
                 BackgroundColor3 = Color3.fromRGB(0, 0, 0)
             }):Play()
         else
-            TweenService:Create(bg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 35, 35)}):Play()
+            TweenService:Create(bg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
             TweenService:Create(circle, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
                 Position = UDim2.new(0, 2, 0.5, -11),
-                BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+                BackgroundColor3 = Color3.fromRGB(80, 80, 80)
             }):Play()
         end
     end
@@ -1115,12 +1244,12 @@ local function MakeToggle(parent, text, key, desc)
 end
 
 -- ============================================
--- SL1D3R CR34T0R B&W
+-- SL1D3R CR34T0R
 -- ============================================
 local function MakeSlider(parent, text, key, min, max, suffix)
     local f = Instance.new("Frame")
     f.Size = UDim2.new(1, 0, 0, 62 * UIScale)
-    f.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    f.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
     f.BorderSizePixel = 0
     f.Parent = parent
     Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
@@ -1130,7 +1259,7 @@ local function MakeSlider(parent, text, key, min, max, suffix)
     lbl.Position = UDim2.new(0, 14, 0, 6)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(235, 235, 235)
+    lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
     lbl.TextSize = 12 * UIScale
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1150,7 +1279,7 @@ local function MakeSlider(parent, text, key, min, max, suffix)
     local sbg = Instance.new("Frame")
     sbg.Size = UDim2.new(1, -28, 0, 6)
     sbg.Position = UDim2.new(0, 14, 0, 40 * UIScale)
-    sbg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    sbg.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     sbg.BorderSizePixel = 0
     sbg.Parent = f
     Instance.new("UICorner", sbg).CornerRadius = UDim.new(0, 3)
@@ -1214,21 +1343,21 @@ MakeToggle(ESPContent, "Box ESP", "Box_ESP", "Kotak di sekitar player")
 MakeToggle(ESPContent, "Name ESP", "Name_ESP", "Nama player")
 MakeToggle(ESPContent, "Distance ESP", "Distance_ESP", "Jarak ke player")
 MakeToggle(ESPContent, "Health ESP", "Health_ESP", "Health bar")
-MakeToggle(ESPContent, "Team Check", "TeamCheck", "Sembunyikan tim")
 MakeSlider(ESPContent, "Max Distance", "MaxDistance", 50, 2000, "m")
 
 -- ============================================
 -- C0MB4T T4B
 -- ============================================
 MakeToggle(CombatContent, "Kill Aura", "KillAura_Enabled", "Auto attack hider // キルオーラ // Килл Аура")
-MakeToggle(CombatContent, "Fast Kill", "FastKill", "Kill instant with tool teleport")
+MakeToggle(CombatContent, "Fast Kill", "FastKill", "Kill instant with tool")
 MakeSlider(CombatContent, "Kill Aura Radius", "KillAura_Radius", 5, 50, " studs")
 MakeSlider(CombatContent, "Kill Aura Delay", "KillAura_Delay", 0.01, 1, "s")
-MakeToggle(CombatContent, "Teleport Hider", "TeleportHider_Enabled", "Teleport ke hider // テレポート // Телепорт")
+MakeToggle(CombatContent, "Teleport Hider", "TeleportHider_Enabled", "Teleport ke hider")
 MakeSlider(CombatContent, "Teleport Delay", "TeleportHider_Delay", 0.5, 5, "s")
-MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Kabur kalau HP rendah")
-MakeSlider(CombatContent, "Safe HP %", "SafeHP", 10, 80, "%")
+MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Kabur otomatis dari Seeker")
 MakeSlider(CombatContent, "Safe Distance", "SafeDistance", 20, 100, " studs")
+MakeToggle(CombatContent, "Seeker Detector", "SeekerDetector", "Alert kalau Seeker dekat")
+MakeSlider(CombatContent, "Detector Range", "DetectorRange", 50, 200, " studs")
 
 -- ============================================
 -- M1SC T4B
@@ -1238,7 +1367,7 @@ MakeToggle(MiscContent, "Coin Bypass TP", "CoinBypass", "Collect tanpa teleport"
 MakeSlider(MiscContent, "Coin Delay", "AutoCoin_Delay", 0.05, 2, "s")
 
 -- ============================================
--- PL4Y3R T4B - SP33D & JUMP
+-- PL4Y3R T4B
 -- ============================================
 MakeToggle(PlayerContent, "Speed Hack", "SpeedHack", "Lari cepat // スピード // Скорость")
 MakeSlider(PlayerContent, "Speed Value", "SpeedValue", 16, 1000, "")
@@ -1274,14 +1403,14 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 -- ============================================
--- T0GGL3 M3NU BUTT0N B&W
+-- T0GGL3 M3NU BUTT0N
 -- ============================================
 local ToggleBtnSize = IsMobile and UDim2.new(0, 55, 0, 55) or UDim2.new(0, 50, 0, 50)
 local MenuBtn = Instance.new("TextButton")
 MenuBtn.Name = "MenuToggle"
 MenuBtn.Size = ToggleBtnSize
 MenuBtn.Position = UDim2.new(0, 18, 0.5, -ToggleBtnSize.Y.Offset / 2)
-MenuBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
 MenuBtn.Text = "👁️"
 MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MenuBtn.TextSize = 26 * UIScale
@@ -1301,7 +1430,7 @@ BtnGlow.Position = UDim2.new(-0.3, 0, -0.3, 0)
 BtnGlow.BackgroundTransparency = 1
 BtnGlow.Image = "rbxassetid://10822646370"
 BtnGlow.ImageColor3 = Color3.fromRGB(255, 255, 255)
-BtnGlow.ImageTransparency =  0.7
+BtnGlow.ImageTransparency = 0.7
 BtnGlow.Parent = MenuBtn
 
 task.spawn(function()
@@ -1321,7 +1450,7 @@ MenuBtn.MouseButton1Click:Connect(function()
         BtnStroke.Color = Color3.fromRGB(255, 255, 255)
         TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = MenuSize}):Play()
     else
-        MenuBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+        MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
         MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         BtnStroke.Color = Color3.fromRGB(255, 255, 255)
     end
@@ -1329,13 +1458,13 @@ end)
 
 MinBtn.MouseButton1Click:Connect(function()
     Main.Visible = false
-    MenuBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
     MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
     Main.Visible = false
-    MenuBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
     MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 end)
 
@@ -1351,7 +1480,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
             MenuBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             MenuBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
         else
-            MenuBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+            MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
             MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         end
     end
@@ -1385,17 +1514,17 @@ pcall(function()
 end)
 
 -- ============================================
--- N0T1F1C4T10N
+-- N0T1F1C4T10N - C0MPL3T3 F1X
 -- ============================================
 task.delay(5, function()
     local N = Instance.new("Frame")
-    N.Size = UDim2.new(0, 380 * UIScale, 0, 75 * UIScale)
-    N.Position = UDim2.new(0.5, -190 * UIScale, 0, -90)
-    N.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+    N.Size = UDim2.new(0, 400 * UIScale, 0, 80 * UIScale)
+    N.Position = UDim2.new(0.5, -200 * UIScale, 0, -95)
+    N.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
     N.BorderSizePixel = 0
     N.Parent = SG
     
-    Instance.new("UICorner", N).CornerRadius = UDim.new(0, 14)
+    Instance.new("UICorner", N).CornerRadius = UDim.new(0, 16)
     
     local NS = Instance.new("UIStroke")
     NS.Color = Color3.fromRGB(255, 255, 255)
@@ -1406,9 +1535,9 @@ task.delay(5, function()
     NT.Size = UDim2.new(1, -20, 0.35, 0)
     NT.Position = UDim2.new(0, 10, 0, 8)
     NT.BackgroundTransparency = 1
-    NT.Text = "Xy1nESP v5.0 B&W G4C0R!"
+    NT.Text = "Xy1nESP v6.0 YT G4C0R!"
     NT.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NT.TextSize = 14 * UIScale
+    NT.TextSize = 15 * UIScale
     NT.Font = Enum.Font.GothamBlack
     NT.Parent = N
     
@@ -1417,7 +1546,7 @@ task.delay(5, function()
     NA.Position = UDim2.new(0, 10, 0.35, 2)
     NA.BackgroundTransparency = 1
     NA.Text = "by @RukanooXD_YT | 完了 | Готово"
-    NA.TextColor3 = Color3.fromRGB(200, 200, 200)
+    NA.TextColor3 = Color3.fromRGB(180, 180, 180)
     NA.TextSize = 11 * UIScale
     NA.Font = Enum.Font.GothamBold
     NA.Parent = N
@@ -1427,15 +1556,15 @@ task.delay(5, function()
     NK.Position = UDim2.new(0, 10, 0.65, 0)
     NK.BackgroundTransparency = 1
     NK.Text = "R1ghtAlt:M3nu | 1ns3rt:ESP | H0m3:K1ll | PgUp:TP | 3nd:C01n | D3l:Sp33d"
-    NK.TextColor3 = Color3.fromRGB(120, 120, 120)
+    NK.TextColor3 = Color3.fromRGB(100, 100, 100)
     NK.TextSize = 9 * UIScale
     NK.Font = Enum.Font.Gotham
     NK.Parent = N
     
-    N:TweenPosition(UDim2.new(0.5, -190 * UIScale, 0, 20), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.6)
+    N:TweenPosition(UDim2.new(0.5, -200 * UIScale, 0, 20), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.6)
     
     task.delay(6, function()
-        N:TweenPosition(UDim2.new(0.5, -190 * UIScale, 0, -90), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.5)
+        N:TweenPosition(UDim2.new(0.5, -200 * UIScale, 0, -95), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.5)
         task.wait(0.6)
         N:Destroy()
     end)
@@ -1444,10 +1573,10 @@ end)
 -- ============================================
 -- F1N4L PR1NT
 -- ============================================
-print("[N4n0Xy1n] Xy1nESP v5.0 B&W L04D3D")
+print("[N4n0Xy1n] Xy1nESP v6.0 YT L04D3D")
 print("[N4n0Xy1n] - .... . / .... .- -.-. -.- / .. ... / .-. . .- .-..")
-print("[N4n0Xy1n] プレイヤーESP v5.0 B&W ロード完了")
-print("[N4n0Xy1n] Игрок ESP v5.0 B&W загружен")
+print("[N4n0Xy1n] プレイヤーESP v6.0 YT ロード完了")
+print("[N4n0Xy1n] Игрок ESP v6.0 YT загружен")
 print("[N4n0Xy1n] @RukanooXD_YT")
 print("[N4n0Xy1n] R0l3: " .. GetRole(LocalPlayer))
 print("[N4n0Xy1n] D3v1c3: " .. (IsMobile and "M0b1l3" or "L4pt0p"))
