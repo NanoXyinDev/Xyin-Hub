@@ -1,11 +1,10 @@
 -- ============================================
--- N4n0Xy1n Xy1nESP v6.2 - AUTO KILL EDITION
--- @RukanooXD_YT // Pembuat Script
--- F34tur3s: ESP, Auto Kill, T3l3p0rt, Byp4ss C01n,
--- Sp33d, Jump, 4ut0 S4f3, S33k3r D3t3ct0r, M0d3rn B&W UI
--- BUG FIX: AutoSafe, AutoCoin, Speed, Jump
--- Y0uTub3 R34dy - C1n3m4t1c & Pr0f3ss10n4l
--- L4ngu4g3: 1nd0 + 3ngl15h + J4p4n353 + Ru5514n
+-- XYINHUB v7.0 - PAINT OR SEEK EDITION
+-- @RukanooXD_YT
+-- Game: Paint or Seek
+-- Features: ESP, Auto Kill, Auto Coin, Auto Safe,
+-- Seeker Detector, Speed, Jump, Cinematic UI
+-- NO DELAY, INSTANT EXECUTE
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -18,63 +17,89 @@ local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 
 -- ============================================
--- D3V1C3 D3T3CT10N
+-- DEVICE DETECTION
 -- ============================================
 local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local UIScale = IsMobile and 0.85 or 1
 
 -- ============================================
--- S3TT1NGS - B&W YT TH3M3
+-- SETTINGS
 -- ============================================
 local Settings = {
-    -- ESP
     ESP_Enabled = false,
-    Line_ESP = false,
-    Box_ESP = false,
-    Name_ESP = false,
-    Distance_ESP = false,
-    Health_ESP = false,
     MaxDistance = 1000,
-    LineOrigin = "Bottom",
-    TextSize = 13,
-    LineThickness = 1.5,
-    BoxThickness = 1.5,
-    -- C0l0r5 B&W
-    LineColor = Color3.fromRGB(255, 255, 255),
-    BoxColor = Color3.fromRGB(255, 255, 255),
-    NameColor = Color3.fromRGB(255, 255, 255),
-    HealthColor = Color3.fromRGB(200, 200, 200),
-    DistanceColor = Color3.fromRGB(180, 180, 180),
-    SeekerColor = Color3.fromRGB(255, 255, 255),
-    HiderColor = Color3.fromRGB(150, 150, 150),
-    DeadColor = Color3.fromRGB(80, 80, 80),
-    -- C0mb4t - Auto Kill (renamed from Kill Aura)
     AutoKill_Enabled = false,
     AutoKill_Radius = 30,
-    AutoKill_Delay = 0.05,
-    FastKill = false,
-    -- T3l3p0rt
+    AutoKill_Delay = 0.1,
     TeleportHider_Enabled = false,
     TeleportHider_Delay = 1.5,
-    -- C01n Byp4ss
     AutoCoin_Enabled = false,
     AutoCoin_Delay = 0.05,
     CoinBypass = true,
-    -- Sp33d & Jump - FIX
     SpeedHack = false,
     SpeedValue = 100,
     JumpHack = false,
     JumpValue = 150,
-    -- 4ut0 S4f3 - S33k3r D3t3ct10n
     AutoSafe = false,
     SafeDistance = 25,
-    -- S33k3r D3t3ct0r
     SeekerDetector = false,
     DetectorRange = 100,
 }
 
 -- ============================================
--- DR4W1NG M4N4G3R
+-- GAME STATE DETECTION
+-- ============================================
+local GameState = {
+    InRound = false,
+    MyRole = "Unknown",
+    RoundTimer = nil,
+    HidersLeft = 0,
+}
+
+local function UpdateGameState()
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return end
+    
+    for _, gui in ipairs(playerGui:GetDescendants()) do
+        if gui:IsA("TextLabel") then
+            local text = gui.Text:lower()
+            if text:match("round ends") or text:match("hiders left") or text:match("seekers left") then
+                GameState.InRound = true
+                local timer = text:match("(%d+:%d+)")
+                if timer then GameState.RoundTimer = timer end
+                return
+            end
+            if text:match("you:%s*seeker") or text:match("you%s*seeker") then
+                GameState.MyRole = "Seeker"
+            elseif text:match("you:%s*hider") or text:match("you%s*hider") then
+                GameState.MyRole = "Hider"
+            end
+        end
+    end
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("BillboardGui") then
+            local txt = ""
+            pcall(function() txt = obj.Text:lower() end)
+            if txt:match("hiders left") or txt:match("round ends") then
+                GameState.InRound = true
+                return
+            end
+        end
+    end
+    
+    GameState.InRound = false
+end
+
+task.spawn(function()
+    while true do
+        UpdateGameState()
+        task.wait(0.5)
+    end
+end)
+
+-- ============================================
+-- DRAWING MANAGER
 -- ============================================
 local ESPObjects = {}
 
@@ -94,20 +119,18 @@ end
 local function CreateESPObjects(p)
     RemoveESP(p)
     ESPObjects[p] = {
-        Line = CreateDrawing("Line", {Thickness = Settings.LineThickness, Color = Settings.LineColor, Transparency = 1, Visible = false, ZIndex = 1}),
-        Box = CreateDrawing("Square", {Thickness = Settings.BoxThickness, Color = Settings.BoxColor, Transparency = 1, Filled = false, Visible = false, ZIndex = 2}),
-        BoxFill = CreateDrawing("Square", {Thickness = 1, Color = Settings.BoxColor, Transparency = 0.08, Filled = true, Visible = false, ZIndex = 1}),
-        Name = CreateDrawing("Text", {Text = "", Size = Settings.TextSize, Center = true, Outline = true, Color = Settings.NameColor, Visible = false, ZIndex = 3}),
-        Dist = CreateDrawing("Text", {Text = "", Size = Settings.TextSize, Center = true, Outline = true, Color = Settings.DistanceColor, Visible = false, ZIndex = 3}),
-        HP = CreateDrawing("Text", {Text = "", Size = Settings.TextSize, Center = true, Outline = true, Color = Settings.HealthColor, Visible = false, ZIndex = 3}),
-        HPBar = CreateDrawing("Line", {Thickness = 2, Color = Settings.HealthColor, Visible = false, ZIndex = 4}),
-        HPBarBG = CreateDrawing("Line", {Thickness = 4, Color = Color3.fromRGB(25, 25, 25), Visible = false, ZIndex = 3}),
-        RoleTag = CreateDrawing("Text", {Text = "", Size = Settings.TextSize + 1, Center = true, Outline = true, Visible = false, ZIndex = 5}),
+        Line = CreateDrawing("Line", {Thickness = 1.5, Color = Color3.fromRGB(255,255,255), Transparency = 1, Visible = false, ZIndex = 1}),
+        Box = CreateDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(255,255,255), Transparency = 1, Filled = false, Visible = false, ZIndex = 2}),
+        BoxFill = CreateDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(255,255,255), Transparency = 0.08, Filled = true, Visible = false, ZIndex = 1}),
+        Name = CreateDrawing("Text", {Text = "", Size = 13, Center = true, Outline = true, Color = Color3.fromRGB(255,255,255), Visible = false, ZIndex = 3}),
+        Dist = CreateDrawing("Text", {Text = "", Size = 13, Center = true, Outline = true, Color = Color3.fromRGB(180,180,180), Visible = false, ZIndex = 3}),
+        HP = CreateDrawing("Text", {Text = "", Size = 13, Center = true, Outline = true, Color = Color3.fromRGB(200,200,200), Visible = false, ZIndex = 3}),
+        RoleTag = CreateDrawing("Text", {Text = "", Size = 14, Center = true, Outline = true, Visible = false, ZIndex = 5}),
     }
 end
 
 -- ============================================
--- PL4Y3R CH3CK5 - F1X3D R0L3
+-- PLAYER CHECKS - PAINT OR SEEK ROLE DETECTION
 -- ============================================
 local function IsAlive(p)
     local c = p.Character
@@ -122,95 +145,88 @@ local function GetHRP(p)
     return c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso")
 end
 
-local function HasWeapon(p)
-    local c = p.Character
-    local bp = p:FindFirstChild("Backpack")
-    local has = false
-    if c then
-        for _, t in ipairs(c:GetChildren()) do
-            if t:IsA("Tool") then has = true break end
-        end
-    end
-    if bp and not has then
-        for _, t in ipairs(bp:GetChildren()) do
-            if t:IsA("Tool") then has = true break end
-        end
-    end
-    return has
-end
-
-local function GetRole(p)
-    local c = p.Character
-    if not c then return "Unknown" end
-    
-    if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") then return "Seeker" end
-    if c:FindFirstChild("Hider") or c:FindFirstChild("IsHider") then return "Hider" end
-    
-    for _, o in ipairs(workspace:GetChildren()) do
-        if o:IsA("Folder") then
-            local n = o.Name:lower()
-            if (n:match("seeker") or n:match("hunter")) and o:FindFirstChild(p.Name) then return "Seeker" end
-            if (n:match("hider") or n:match("hidden")) and o:FindFirstChild(p.Name) then return "Hider" end
-        end
-    end
-    
-    if p.Team then
-        local tn = p.Team.Name:lower()
-        if tn:match("seeker") or tn:match("hunter") or tn:match("tagger") then return "Seeker" end
-        if tn:match("hider") or tn:match("hidden") then return "Hider" end
-    end
-    
-    if p:FindFirstChild("leaderstats") then
-        for _, s in ipairs(p.leaderstats:GetChildren()) do
-            local sn = s.Name:lower()
-            if sn:match("seeker") or sn:match("hunter") then
-                if tonumber(s.Value) and tonumber(s.Value) > 0 then return "Seeker" end
+local function GetPlayerRole(p)
+    local playerGui = p:FindFirstChild("PlayerGui")
+    if playerGui then
+        for _, gui in ipairs(playerGui:GetDescendants()) do
+            if gui:IsA("TextLabel") then
+                local text = gui.Text:lower()
+                if text:match("you:%s*seeker") or text:match("role:%s*seeker") or text:match("team:%s*seeker") then
+                    return "Seeker"
+                end
+                if text:match("you:%s*hider") or text:match("role:%s*hider") or text:match("team:%s*hider") then
+                    return "Hider"
+                end
             end
         end
     end
     
-    if HasWeapon(p) then return "Seeker" end
-    
-    for _, g in ipairs(c:GetDescendants()) do
-        if g:IsA("BillboardGui") or g:IsA("TextLabel") then
-            local txt = ""
-            pcall(function() txt = g.Text:lower() end)
-            if txt:match("seeker") or txt:match("hunter") then return "Seeker" end
-            if txt:match("hider") or txt:match("hidden") then return "Hider" end
+    local c = p.Character
+    if c then
+        if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") then return "Seeker" end
+        if c:FindFirstChild("Hider") or c:FindFirstChild("IsHider") then return "Hider" end
+        
+        for _, tool in ipairs(c:GetChildren()) do
+            if tool:IsA("Tool") then
+                local tn = tool.Name:lower()
+                if tn:match("paint") or tn:match("brush") or tn:match("bucket") or tn:match("seek") then
+                    return "Seeker"
+                end
+            end
+        end
+        
+        local bp = p:FindFirstChild("Backpack")
+        if bp then
+            for _, tool in ipairs(bp:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local tn = tool.Name:lower()
+                    if tn:match("paint") or tn:match("brush") or tn:match("bucket") or tn:match("seek") then
+                        return "Seeker"
+                    end
+                end
+            end
+        end
+        
+        for _, g in ipairs(c:GetDescendants()) do
+            if g:IsA("BillboardGui") or g:IsA("TextLabel") then
+                local txt = ""
+                pcall(function() txt = g.Text:lower() end)
+                if txt:match("seeker") then return "Seeker" end
+                if txt:match("hider") then return "Hider" end
+            end
         end
     end
     
-    local hum = c:FindFirstChildOfClass("Humanoid")
-    if hum and hum.WalkSpeed > 30 then return "Seeker" end
-    
     if p == LocalPlayer then
-        return HasWeapon(p) and "Seeker" or "Hider"
+        if GameState.MyRole ~= "Unknown" then
+            return GameState.MyRole
+        end
     end
     
-    local myRole = GetRole(LocalPlayer)
-    if myRole == "Seeker" then return "Hider" end
-    if myRole == "Hider" then return "Seeker" end
+    if p ~= LocalPlayer then
+        local myRole = GetPlayerRole(LocalPlayer)
+        if myRole == "Seeker" then return "Hider" end
+        if myRole == "Hider" then return "Seeker" end
+    end
     
-    return "Hider"
+    return "Unknown"
 end
 
 local function IsHider(p)
-    return p ~= LocalPlayer and IsAlive(p) and GetRole(p) == "Hider"
+    return p ~= LocalPlayer and IsAlive(p) and GetPlayerRole(p) == "Hider"
 end
 
 local function IsSeeker(p)
-    return p ~= LocalPlayer and IsAlive(p) and GetRole(p) == "Seeker"
+    return p ~= LocalPlayer and IsAlive(p) and GetPlayerRole(p) == "Seeker"
 end
 
 local function AmISeeker()
-    return GetRole(LocalPlayer) == "Seeker"
+    return GetPlayerRole(LocalPlayer) == "Seeker"
 end
 
 -- ============================================
--- 3SP UPD4T3
+-- ESP UPDATE
 -- ============================================
-local BoxOffset = {X = 0, Y = 0}
-
 local function UpdateESP()
     if not Settings.ESP_Enabled then
         for _, o in pairs(ESPObjects) do
@@ -258,14 +274,13 @@ local function UpdateESP()
         if not ESPObjects[p] then CreateESPObjects(p) end
         local o = ESPObjects[p]
         
-        local role = GetRole(p)
+        local role = GetPlayerRole(p)
         local hp = hum.Health
         local maxHp = hum.MaxHealth
-        local hpPct = hp / maxHp
         
-        local color = Settings.BoxColor
-        if role == "Seeker" then color = Settings.SeekerColor
-        elseif role == "Hider" then color = Settings.HiderColor end
+        local color = Color3.fromRGB(255,255,255)
+        if role == "Seeker" then color = Color3.fromRGB(255,80,80)
+        elseif role == "Hider" then color = Color3.fromRGB(80,255,80) end
         
         local cf, size = c:GetBoundingBox()
         if not cf then continue end
@@ -277,21 +292,10 @@ local function UpdateESP()
         
         local h = math.abs(top.Y - bot.Y)
         local w = h * 0.55
-        local bx = pos.X - w / 2 + BoxOffset.X
-        local by = top.Y + BoxOffset.Y
+        local bx = pos.X - w / 2
+        local by = top.Y
         
-        if Settings.Line_ESP and o.Line then
-            local origin
-            if Settings.LineOrigin == "Bottom" then origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-            elseif Settings.LineOrigin == "Top" then origin = Vector2.new(Camera.ViewportSize.X / 2, 0)
-            else origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) end
-            o.Line.From = origin
-            o.Line.To = Vector2.new(pos.X, pos.Y)
-            o.Line.Color = Settings.LineColor
-            o.Line.Visible = true
-        else pcall(function() o.Line.Visible = false end) end
-        
-        if Settings.Box_ESP and o.Box and o.BoxFill then
+        if o.Box and o.BoxFill then
             o.Box.Size = Vector2.new(w, h)
             o.Box.Position = Vector2.new(bx, by)
             o.Box.Color = color
@@ -300,87 +304,80 @@ local function UpdateESP()
             o.BoxFill.Position = Vector2.new(bx, by)
             o.BoxFill.Color = color
             o.BoxFill.Visible = true
-        else
-            pcall(function() o.Box.Visible = false end)
-            pcall(function() o.BoxFill.Visible = false end)
         end
         
-        if Settings.Name_ESP and o.Name then
+        if o.Name then
             o.Name.Text = p.Name .. " [" .. role .. "]"
             o.Name.Position = Vector2.new(pos.X, top.Y - 18)
-            o.Name.Color = role == "Seeker" and Settings.SeekerColor or Settings.NameColor
+            o.Name.Color = color
             o.Name.Visible = true
-        else pcall(function() o.Name.Visible = false end) end
+        end
         
         if o.RoleTag then
             o.RoleTag.Text = role
             o.RoleTag.Position = Vector2.new(pos.X, top.Y - 32)
-            o.RoleTag.Color = role == "Seeker" and Settings.SeekerColor or Settings.HiderColor
+            o.RoleTag.Color = color
             o.RoleTag.Visible = true
         end
         
-        if Settings.Distance_ESP and o.Dist and lHRP then
+        if o.Dist and lHRP then
             local d = math.floor((hrp.Position - lHRP.Position).Magnitude)
             o.Dist.Text = d .. "m"
             o.Dist.Position = Vector2.new(pos.X, bot.Y + 5)
             o.Dist.Visible = true
-        else pcall(function() o.Dist.Visible = false end) end
+        end
         
-        if Settings.Health_ESP and o.HP and o.HPBar and o.HPBarBG then
+        if o.HP then
             o.HP.Text = math.floor(hp) .. "/" .. math.floor(maxHp)
             o.HP.Position = Vector2.new(pos.X, bot.Y + 18)
             o.HP.Visible = true
-            local barX = bx - 5
-            o.HPBarBG.From = Vector2.new(barX, by)
-            o.HPBarBG.To = Vector2.new(barX, by + h)
-            o.HPBarBG.Visible = true
-            local hh = h * hpPct
-            o.HPBar.From = Vector2.new(barX, by + h - hh)
-            o.HPBar.To = Vector2.new(barX, by + h)
-            if hpPct > 0.6 then o.HPBar.Color = Color3.fromRGB(200, 200, 200)
-            elseif hpPct > 0.3 then o.HPBar.Color = Color3.fromRGB(150, 150, 150)
-            else o.HPBar.Color = Color3.fromRGB(100, 100, 100) end
-            o.HPBar.Visible = true
-        else
-            pcall(function() o.HP.Visible = false end)
-            pcall(function() o.HPBar.Visible = false end)
-            pcall(function() o.HPBarBG.Visible = false end)
+        end
+        
+        if o.Line then
+            o.Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+            o.Line.To = Vector2.new(pos.X, pos.Y)
+            o.Line.Color = color
+            o.Line.Visible = true
         end
     end
 end
 
 -- ============================================
--- 4UT0 K1LL - F4ST & F1X3D (renamed from Kill Aura)
+-- AUTO KILL - TELEPORT + AUTO SWING (PAINT OR SEEK)
 -- ============================================
 local AutoKillConn = nil
+
+local function GetTool()
+    local c = LocalPlayer.Character
+    if not c then return nil end
+    for _, t in ipairs(c:GetChildren()) do
+        if t:IsA("Tool") then return t end
+    end
+    local bp = LocalPlayer:FindFirstChild("Backpack")
+    if bp then
+        for _, t in ipairs(bp:GetChildren()) do
+            if t:IsA("Tool") then
+                c:FindFirstChildOfClass("Humanoid"):EquipTool(t)
+                task.wait(0.1)
+                return t
+            end
+        end
+    end
+    return nil
+end
 
 local function StartAutoKill()
     if AutoKillConn then return end
     AutoKillConn = RunService.Heartbeat:Connect(function()
         if not Settings.AutoKill_Enabled then return end
         if not AmISeeker() then return end
+        if not GameState.InRound then return end
         
         local lChar = LocalPlayer.Character
         local lHRP = lChar and GetHRP(LocalPlayer)
         if not lHRP then return end
         
-        local tool = nil
-        for _, c in ipairs(lChar:GetChildren()) do
-            if c:IsA("Tool") then tool = c break end
-        end
-        
-        if not tool then
-            local bp = LocalPlayer:FindFirstChild("Backpack")
-            if bp then
-                for _, t in ipairs(bp:GetChildren()) do
-                    if t:IsA("Tool") then
-                        lChar.Humanoid:EquipTool(t)
-                        tool = t
-                        break
-                    end
-                end
-            end
-        end
+        local tool = GetTool()
         
         for _, p in ipairs(Players:GetPlayers()) do
             if p == LocalPlayer then continue end
@@ -393,8 +390,19 @@ local function StartAutoKill()
             
             local dist = (hrp.Position - lHRP.Position).Magnitude
             if dist <= Settings.AutoKill_Radius then
-                pcall(function() hum:TakeDamage(100) end)
-                pcall(function() hum.Health = 0 end)
+                local oldCFrame = lHRP.CFrame
+                lHRP.CFrame = hrp.CFrame * CFrame.new(0, 0, 3)
+                
+                if tool then
+                    pcall(function()
+                        tool:Activate()
+                        local handle = tool:FindFirstChild("Handle")
+                        if handle then
+                            firetouchinterest(handle, hrp, 0)
+                            firetouchinterest(handle, hrp, 1)
+                        end
+                    end)
+                end
                 
                 pcall(function()
                     for _, part in ipairs(lChar:GetDescendants()) do
@@ -405,21 +413,8 @@ local function StartAutoKill()
                     end
                 end)
                 
-                if tool then
-                    pcall(function()
-                        local h = tool:FindFirstChild("Handle")
-                        if h then
-                            firetouchinterest(h, hrp, 0)
-                            firetouchinterest(h, hrp, 1)
-                            if Settings.FastKill then
-                                local old = h.CFrame
-                                h.CFrame = hrp.CFrame
-                                task.wait(0.02)
-                                h.CFrame = old
-                            end
-                        end
-                    end)
-                end
+                task.wait(0.05)
+                lHRP.CFrame = oldCFrame
             end
             task.wait(Settings.AutoKill_Delay)
         end
@@ -427,7 +422,7 @@ local function StartAutoKill()
 end
 
 -- ============================================
--- 4UT0 S4F3 - FIX K4BUR D4R1 S33K3R
+-- AUTO SAFE - ONLY DURING ROUND, FROM REAL SEEKERS
 -- ============================================
 local SafeConn = nil
 local LastSafeTeleport = 0
@@ -436,6 +431,7 @@ local function StartAutoSafe()
     if SafeConn then return end
     SafeConn = RunService.Heartbeat:Connect(function()
         if not Settings.AutoSafe then return end
+        if not GameState.InRound then return end
         if AmISeeker() then return end
         
         local lChar = LocalPlayer.Character
@@ -443,7 +439,6 @@ local function StartAutoSafe()
         local lHum = lChar and lChar:FindFirstChildOfClass("Humanoid")
         if not lHRP or not lHum then return end
         
-        -- C00ld0wn 0.5s t0 pr3v3nt sp4m t3l3p0rt
         if tick() - LastSafeTeleport < 0.5 then return end
         
         local nearestSeeker = nil
@@ -454,6 +449,21 @@ local function StartAutoSafe()
             if not IsSeeker(p) then continue end
             
             local c = p.Character
+            local hasTool = false
+            if c then
+                for _, t in ipairs(c:GetChildren()) do
+                    if t:IsA("Tool") then hasTool = true break end
+                end
+            end
+            local bp = p:FindFirstChild("Backpack")
+            if bp and not hasTool then
+                for _, t in ipairs(bp:GetChildren()) do
+                    if t:IsA("Tool") then hasTool = true break end
+                end
+            end
+            
+            if not hasTool then continue end
+            
             local hrp = c and GetHRP(p)
             if hrp then
                 local d = (hrp.Position - lHRP.Position).Magnitude
@@ -464,29 +474,21 @@ local function StartAutoSafe()
             end
         end
         
-        -- K4bur 1f s33k3r 1s cl0s3
         if nearestSeeker and nearestDist < Settings.SafeDistance then
-            -- FIX: C4lcu14t3 4w4y d1r3ct10n w1th Y pr3s3rv3d
             local awayDir = (lHRP.Position - nearestSeeker.Position).Unit
-            -- FIX: Sh0rt3r t3l3p0rt d1st4nc3 (15-20 studs) t0 4v01d v01d
             local safePos = lHRP.Position + awayDir * 20
-            -- FIX: K33p Y 4b0v3 gr0und
             safePos = Vector3.new(
                 math.clamp(safePos.X, -500, 500),
                 math.max(safePos.Y, 5),
                 math.clamp(safePos.Z, -500, 500)
             )
             
-            -- FIX: Uns1t b3f0r3 t3l3p0rt
             pcall(function() lHum.Sit = false end)
             pcall(function() lHum.PlatformStand = false end)
             
-            -- FIX: T3l3p0rt w1th CFr4m3 + V3l0c1ty r3s3t
             lHRP.CFrame = CFrame.new(safePos)
             lHRP.Velocity = Vector3.new(0, 0, 0)
-            lHRP.RotVelocity = Vector3.new(0, 0, 0)
             
-            -- FIX: M0v3T0 t0 pr3v3nt st4ck1ng
             pcall(function()
                 lHum:MoveTo(safePos + awayDir * 5)
             end)
@@ -497,7 +499,7 @@ local function StartAutoSafe()
 end
 
 -- ============================================
--- S33K3R D3T3CT0R - 4L3RT SYST3M
+-- SEEKER DETECTOR - ONLY DURING ROUND
 -- ============================================
 local DetectorText = CreateDrawing("Text", {
     Text = "",
@@ -518,8 +520,21 @@ local DetectorLine = CreateDrawing("Line", {
     ZIndex = 99
 })
 
+local LastDetectorReset = 0
+
+local function ResetDetector()
+    DetectorText.Visible = false
+    DetectorLine.Visible = false
+    LastDetectorReset = tick()
+end
+
 local function StartSeekerDetector()
     RunService.RenderStepped:Connect(function()
+        if not GameState.InRound then
+            ResetDetector()
+            return
+        end
+        
         if not Settings.SeekerDetector then
             DetectorText.Visible = false
             DetectorLine.Visible = false
@@ -561,7 +576,7 @@ local function StartSeekerDetector()
             
             local flash = math.abs(math.sin(tick() * 8))
             DetectorText.Color = Color3.fromRGB(255, 255 * (1 - flash), 255 * (1 - flash))
-            DetectorText.Text = "⚠️ S33K3R " .. nearestSeeker.Name .. " " .. math.floor(nearestDist) .. "m ⚠️"
+            DetectorText.Text = "SEEKER " .. nearestSeeker.Name .. " " .. math.floor(nearestDist) .. "m"
             DetectorText.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y - 120)
             DetectorText.Visible = true
             
@@ -577,7 +592,7 @@ local function StartSeekerDetector()
 end
 
 -- ============================================
--- SP33D H4CK - FIX 3X4CT V4LU3
+-- SPEED HACK
 -- ============================================
 local SpeedConn = nil
 local SpeedPropConn = nil
@@ -585,7 +600,6 @@ local SpeedPropConn = nil
 local function StartSpeedHack()
     if SpeedConn then return end
     
-    -- L4y3r 1: R3nd3rSt3pp3d f0r f4st 0v3rwr1t3
     SpeedConn = RunService.RenderStepped:Connect(function()
         if not Settings.SpeedHack then return end
         local c = LocalPlayer.Character
@@ -595,7 +609,6 @@ local function StartSpeedHack()
         end
     end)
     
-    -- L4y3r 2: Pr0p3rtyCh4ng3dS1gn4l f0r 4nt1-ch34t r3s1st4nc3
     local c = LocalPlayer.Character
     local h = c and c:FindFirstChildOfClass("Humanoid")
     if h then
@@ -607,7 +620,6 @@ local function StartSpeedHack()
         end)
     end
     
-    -- R3c0nn3ct 0n ch4r4ct3r ch4ng3
     LocalPlayer.CharacterAdded:Connect(function(newChar)
         task.wait(0.5)
         local newHum = newChar:FindFirstChildOfClass("Humanoid")
@@ -624,26 +636,22 @@ local function StartSpeedHack()
 end
 
 -- ============================================
--- JUMP H4CK - FIX M0D3RN R0BL0X
+-- JUMP HACK
 -- ============================================
 local JumpConn = nil
-local JumpPropConn = nil
 
 local function StartJumpHack()
     if JumpConn then return end
     
-    -- FIX: M0d3rn R0bl0x us3s JumpH31ght, n0t JumpP0w3r
     JumpConn = RunService.RenderStepped:Connect(function()
         if not Settings.JumpHack then return end
         local c = LocalPlayer.Character
         local h = c and c:FindFirstChildOfClass("Humanoid")
         if h then
-            -- FIX: S3t JumpH31ght 1nst34d 0f JumpP0w3r
             pcall(function()
-                h.JumpHeight = Settings.JumpValue / 10 -- Sc4l3 t0 h31ght
+                h.JumpHeight = Settings.JumpValue / 10
                 h.UseJumpHeight = true
             end)
-            -- F4llb4ck: 1f JumpH31ght n0t 4v41l4bl3, us3 0ld JumpP0w3r
             pcall(function()
                 if h:FindFirstChild("JumpPower") then
                     h.JumpPower = Settings.JumpValue
@@ -652,7 +660,6 @@ local function StartJumpHack()
         end
     end)
     
-    -- FIX: 4ut0-jump wh3n sp4c3 pr3ss3d w1th 1ncr34s3d h31ght
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
         if not Settings.JumpHack then return end
@@ -669,7 +676,7 @@ local function StartJumpHack()
 end
 
 -- ============================================
--- T3L3P0RT H1D3R
+-- TELEPORT HIDER
 -- ============================================
 local TPConn = nil
 local HiderList = {}
@@ -721,13 +728,14 @@ local function StartTP()
 end
 
 -- ============================================
--- 4UT0 C01N - FIX T0T4L
+-- AUTO COIN - FIX TOTAL
 -- ============================================
 local CoinConn = nil
 local CoinBlacklist = {
     "invite", "friend", "gui", "button", "frame", "label", "menu", "shop", "settings",
     "inventory", "taunt", "pose", "lock", "paint", "troll", "become", "tiny", "giant",
-    "portal", "spawn", "lobby", "home", "base", "checkpoint", "chest", "crate", "box"
+    "portal", "spawn", "lobby", "home", "base", "checkpoint", "chest", "crate", "box",
+    "camo", "sample", "fill", "brush", "bucket"
 }
 
 local CachedCoins = {}
@@ -739,24 +747,22 @@ local function IsRealCoin(obj)
     for _, bl in ipairs(CoinBlacklist) do
         if n:match(bl) then return false end
     end
-    -- Ch3ck 1f 4lr34dy c0ll3ct3d
     if obj:FindFirstChild("Collected") then return false end
-    return obj:FindFirstChildWhichIsA("TouchInterest") ~= nil
+    local hasTouch = obj:FindFirstChildWhichIsA("TouchInterest") ~= nil
+    local hasPrompt = obj:FindFirstChildWhichIsA("ProximityPrompt") ~= nil
+    return hasTouch or hasPrompt
 end
 
-local function ScanCoinsFast()
-    -- FIX: C4ch3 sc4n 3v3ry 2 s3c0nds 1nst34d 0f 3v3ry fr4m3
-    if tick() - LastCoinScan < 2 then return CachedCoins end
+local function ScanCoins()
+    if tick() - LastCoinScan < 1 then return CachedCoins end
     
     CachedCoins = {}
-    -- FIX: Us3 G3tP4rtB0unds1nR4d1us f0r f4st3r d3t3ct10n
     local lChar = LocalPlayer.Character
     local lHRP = lChar and GetHRP(LocalPlayer)
     if not lHRP then return CachedCoins end
     
-    local searchPos = lHRP.Position
     local success, parts = pcall(function()
-        return Workspace:GetPartBoundsInRadius(searchPos, 400)
+        return Workspace:GetPartBoundsInRadius(lHRP.Position, 300)
     end)
     
     if success and parts then
@@ -773,31 +779,16 @@ local function ScanCoinsFast()
                 end
             end
         end
-    else
-        -- F4llb4ck: Sl0w sc4n
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") or obj:IsA("MeshPart") then
-                local n = obj.Name:lower()
-                if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
-                   n:match("gem") or n:match("token") or n:match("collect") then
-                    if IsRealCoin(obj) then
-                        table.insert(CachedCoins, obj)
-                    end
-                end
-            end
-        end
     end
     
     LastCoinScan = tick()
     return CachedCoins
 end
 
--- R34l-t1m3 c01n d3t3ct10n
 Workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("BasePart") or obj:IsA("MeshPart") then
         local n = obj.Name:lower()
-        if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
-           n:match("gem") or n:match("token") or n:match("collect") then
+        if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") then
             if IsRealCoin(obj) then
                 table.insert(CachedCoins, obj)
             end
@@ -823,7 +814,7 @@ local function StartCoin()
                 continue
             end
             
-            local coins = ScanCoinsFast()
+            local coins = ScanCoins()
             local lChar = LocalPlayer.Character
             local lHRP = lChar and GetHRP(LocalPlayer)
             
@@ -837,21 +828,13 @@ local function StartCoin()
                     end
                     
                     local dist = (coin.Position - lHRP.Position).Magnitude
-                    local cy = coin.Position.Y
-                    
-                    if dist < 300 and cy > -100 and cy < 500 then
+                    if dist < 200 then
                         if Settings.CoinBypass then
-                            -- FIX: BYP4SS - M0v3 c01n t0 pl4y3r p0s + f1r3 t0uch
                             pcall(function()
-                                -- St0r3 0r1g1n4l p0s
-                                local oldPos = coin.Position
                                 local oldCFrame = coin.CFrame
-                                
-                                -- M0v3 c01n t0 pl4y3r
                                 coin.CFrame = lHRP.CFrame
                                 task.wait(0.05)
                                 
-                                -- F1r3 t0uch w1th mult1pl3 p4rts
                                 for _, part in ipairs(lChar:GetDescendants()) do
                                     if part:IsA("BasePart") then
                                         firetouchinterest(part, coin, 0)
@@ -862,21 +845,30 @@ local function StartCoin()
                                 firetouchinterest(lHRP, coin, 0)
                                 firetouchinterest(lHRP, coin, 1)
                                 
+                                local prompt = coin:FindFirstChildWhichIsA("ProximityPrompt")
+                                if prompt then
+                                    fireproximityprompt(prompt)
+                                end
+                                
                                 task.wait(0.05)
                                 
-                                -- R3st0r3 0r1g1n4l p0s 1f st1ll 3x1sts
                                 if coin and coin.Parent then
                                     coin.CFrame = oldCFrame
                                 end
                             end)
                         else
-                            -- FIX: N0rm4l t3l3p0rt - cl0s3r d1st4nc3 + f4st3r
                             pcall(function()
                                 local oldPos = lHRP.CFrame
                                 lHRP.CFrame = coin.CFrame * CFrame.new(0, 2, 0)
                                 task.wait(0.05)
                                 firetouchinterest(lHRP, coin, 0)
                                 firetouchinterest(lHRP, coin, 1)
+                                
+                                local prompt = coin:FindFirstChildWhichIsA("ProximityPrompt")
+                                if prompt then
+                                    fireproximityprompt(prompt)
+                                end
+                                
                                 task.wait(0.05)
                                 lHRP.CFrame = oldPos
                             end)
@@ -885,13 +877,13 @@ local function StartCoin()
                     task.wait(Settings.AutoCoin_Delay)
                 end
             end
-            task.wait(0.2)
+            task.wait(0.1)
         end
     end)
 end
 
 -- ============================================
--- PL4Y3R 3V3NT5
+-- PLAYER EVENTS
 -- ============================================
 Players.PlayerAdded:Connect(function(p)
     p.CharacterAdded:Connect(function()
@@ -909,7 +901,7 @@ for _, p in ipairs(Players:GetPlayers()) do
 end
 
 -- ============================================
--- 1N1T14L1Z3 4LL SYST3M5
+-- INITIALIZE ALL SYSTEMS
 -- ============================================
 RunService.RenderStepped:Connect(UpdateESP)
 StartAutoKill()
@@ -921,7 +913,7 @@ StartTP()
 StartCoin()
 
 -- ============================================
--- UI - B&W YT PR0F3SS10N4L
+-- UI - CINEMATIC B&W PROFESSIONAL
 -- ============================================
 local SG = Instance.new("ScreenGui")
 SG.Name = "XyinESP_" .. tostring(math.random(10000, 99999))
@@ -929,7 +921,7 @@ SG.Parent = CoreGui
 SG.ResetOnSpawn = false
 SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- W4T3RM4RK
+-- Watermark
 local Watermark = Instance.new("TextLabel")
 Watermark.Size = UDim2.new(0, 200, 0, 20)
 Watermark.Position = UDim2.new(1, -210, 0, 10)
@@ -941,7 +933,9 @@ Watermark.Font = Enum.Font.GothamBold
 Watermark.TextTransparency = 0.3
 Watermark.Parent = SG
 
--- L04D1NG SCR33N
+-- ============================================
+-- LOADING SCREEN - CINEMATIC GLITCH
+-- ============================================
 local Loading = Instance.new("Frame")
 Loading.Size = UDim2.new(1, 0, 1, 0)
 Loading.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -949,21 +943,33 @@ Loading.BorderSizePixel = 0
 Loading.ZIndex = 9999
 Loading.Parent = SG
 
-local LG = Instance.new("UIGradient")
-LG.Color = ColorSequence.new({
+for i = 0, 1, 0.02 do
+    local line = Instance.new("Frame")
+    line.Size = UDim2.new(1, 0, 0, 1)
+    line.Position = UDim2.new(0, 0, i, 0)
+    line.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    line.BackgroundTransparency = 0.7
+    line.BorderSizePixel = 0
+    line.ZIndex = 9998
+    line.Parent = Loading
+end
+
+local Gradient = Instance.new("UIGradient")
+Gradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 10, 10)),
+    ColorSequenceKeypoint.new(0.3, Color3.fromRGB(15, 15, 15)),
+    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(10, 10, 10)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
 })
-LG.Rotation = 45
-LG.Parent = Loading
+Gradient.Rotation = 90
+Gradient.Parent = Loading
 
-for i = 1, 25 do
+for i = 1, 30 do
     local p = Instance.new("Frame")
-    p.Size = UDim2.new(0, math.random(1, 4), 0, math.random(1, 4))
+    p.Size = UDim2.new(0, math.random(2, 5), 0, math.random(2, 5))
     p.Position = UDim2.new(math.random(), 0, math.random(), 0)
     p.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    p.BackgroundTransparency = math.random(6, 9) / 10
+    p.BackgroundTransparency = math.random(5, 9) / 10
     p.BorderSizePixel = 0
     p.ZIndex = 10000
     p.Parent = Loading
@@ -971,41 +977,51 @@ for i = 1, 25 do
     
     task.spawn(function()
         while p.Parent do
-            TweenService:Create(p, TweenInfo.new(math.random(4, 8)), {
+            TweenService:Create(p, TweenInfo.new(math.random(3, 7)), {
                 Position = UDim2.new(math.random(), 0, math.random(), 0),
-                BackgroundTransparency = math.random(6, 9) / 10
+                BackgroundTransparency = math.random(5, 9) / 10
             }):Play()
-            task.wait(math.random(4, 8))
+            task.wait(math.random(3, 7))
         end
     end)
 end
 
+local GlitchTexts = {"XYINHUB", "X_Y_I_N_H_U_B", "X#Y#I#N#H#U#B", "XY1NHUB", "X¥INHUB"}
 local Logo = Instance.new("TextLabel")
-Logo.Size = UDim2.new(0, 600, 0, 70 * UIScale)
-Logo.Position = UDim2.new(0.5, -300, 0.3, 0)
+Logo.Size = UDim2.new(0, 600, 0, 80 * UIScale)
+Logo.Position = UDim2.new(0.5, -300, 0.28, 0)
 Logo.BackgroundTransparency = 1
 Logo.Text = ""
 Logo.TextColor3 = Color3.fromRGB(255, 255, 255)
-Logo.TextSize = 52 * UIScale
+Logo.TextSize = 56 * UIScale
 Logo.Font = Enum.Font.GothamBlack
 Logo.ZIndex = 10001
 Logo.Parent = Loading
 
 task.spawn(function()
-    local text = "N4n0Xy1n"
-    for i = 1, #text do
-        Logo.Text = string.sub(text, 1, i)
-        task.wait(0.08)
+    local finalText = "XYINHUB"
+    for i = 1, #finalText do
+        local char = string.sub(finalText, 1, i)
+        Logo.Text = char
+        task.wait(0.1)
     end
+    
+    for i = 1, 8 do
+        Logo.Text = GlitchTexts[math.random(1, #GlitchTexts)]
+        Logo.TextColor3 = Color3.fromRGB(math.random(200, 255), math.random(200, 255), math.random(200, 255))
+        task.wait(0.05)
+    end
+    Logo.Text = finalText
+    Logo.TextColor3 = Color3.fromRGB(255, 255, 255)
 end)
 
 local Glow = Instance.new("TextLabel")
 Glow.Size = Logo.Size
-Glow.Position = UDim2.new(0.5, -298, 0.3, 2)
+Glow.Position = UDim2.new(0.5, -298, 0.28, 2)
 Glow.BackgroundTransparency = 1
-Glow.Text = "N4n0Xy1n"
+Glow.Text = "XYINHUB"
 Glow.TextColor3 = Color3.fromRGB(255, 255, 255)
-Glow.TextSize = 52 * UIScale
+Glow.TextSize = 56 * UIScale
 Glow.Font = Enum.Font.GothamBlack
 Glow.TextTransparency = 0.85
 Glow.ZIndex = 10000
@@ -1013,9 +1029,9 @@ Glow.Parent = Loading
 
 local Sub = Instance.new("TextLabel")
 Sub.Size = UDim2.new(0, 600, 0, 25 * UIScale)
-Sub.Position = UDim2.new(0.5, -300, 0.38, 0)
+Sub.Position = UDim2.new(0.5, -300, 0.37, 0)
 Sub.BackgroundTransparency = 1
-Sub.Text = "Xy1nESP v6.2 Auto Kill // プレイヤーESP // Игрок ESP"
+Sub.Text = "Paint or Seek Edition | v7.0 | Premium Script"
 Sub.TextColor3 = Color3.fromRGB(120, 120, 120)
 Sub.TextSize = 13 * UIScale
 Sub.Font = Enum.Font.Gotham
@@ -1024,7 +1040,7 @@ Sub.Parent = Loading
 
 local Auth = Instance.new("TextLabel")
 Auth.Size = UDim2.new(0, 300, 0, 20 * UIScale)
-Auth.Position = UDim2.new(0.5, -150, 0.42, 0)
+Auth.Position = UDim2.new(0.5, -150, 0.41, 0)
 Auth.BackgroundTransparency = 1
 Auth.Text = "by @RukanooXD_YT"
 Auth.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -1034,8 +1050,8 @@ Auth.ZIndex = 10001
 Auth.Parent = Loading
 
 local BarBG = Instance.new("Frame")
-BarBG.Size = UDim2.new(0, 300 * UIScale, 0, 4)
-BarBG.Position = UDim2.new(0.5, -150 * UIScale, 0.5, 0)
+BarBG.Size = UDim2.new(0, 320 * UIScale, 0, 4)
+BarBG.Position = UDim2.new(0.5, -160 * UIScale, 0.5, 0)
 BarBG.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 BarBG.BorderSizePixel = 0
 BarBG.ZIndex = 10001
@@ -1074,14 +1090,15 @@ Status.Parent = Loading
 
 task.spawn(function()
     local stages = {
-        {pct = 12, txt = "Initializing Core..."},
-        {pct = 28, txt = "Loading ESP Engine..."},
-        {pct = 42, txt = "Loading Combat Systems..."},
-        {pct = 56, txt = "Loading Speed & Jump Fix..."},
-        {pct = 68, txt = "Loading Auto Safe Fix..."},
-        {pct = 78, txt = "Loading Coin Fix..."},
+        {pct = 10, txt = "Initializing Core..."},
+        {pct = 22, txt = "Loading ESP Engine..."},
+        {pct = 35, txt = "Loading Combat Systems..."},
+        {pct = 48, txt = "Loading Speed & Jump..."},
+        {pct = 58, txt = "Loading Auto Safe..."},
+        {pct = 68, txt = "Loading Seeker Detector..."},
+        {pct = 78, txt = "Loading Coin Collector..."},
         {pct = 88, txt = "Building Cinematic UI..."},
-        {pct = 96, txt = "Finalizing..."},
+        {pct = 95, txt = "Finalizing..."},
         {pct = 100, txt = "Ready!"},
     }
     
@@ -1093,12 +1110,12 @@ task.spawn(function()
             BarFill.Size = UDim2.new(cur / 100, 0, 1, 0)
             Pct.Text = cur .. "%"
             Status.Text = s.txt
-            task.wait(0.05)
+            task.wait(0.04)
         end
-        task.wait(0.2)
+        task.wait(0.15)
     end
     
-    task.wait(0.8)
+    task.wait(0.6)
     
     for _, child in ipairs(Loading:GetDescendants()) do
         if child:IsA("TextLabel") then
@@ -1113,7 +1130,9 @@ task.spawn(function()
     Loading:Destroy()
 end)
 
--- M41N M3NU
+-- ============================================
+-- MAIN MENU - PROFESSIONAL B&W
+-- ============================================
 local MenuSize = IsMobile and UDim2.new(0, 300, 0, 400) or UDim2.new(0, 400, 0, 540)
 local Main = Instance.new("Frame")
 Main.Name = "MainMenu"
@@ -1161,7 +1180,7 @@ local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(1, -120, 0, 28 * UIScale)
 TitleText.Position = UDim2.new(0, 18, 0, 6)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Xy1nESP v6.2"
+TitleText.Text = "XYINHUB v7.0"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.TextSize = 18 * UIScale
 TitleText.Font = Enum.Font.GothamBlack
@@ -1172,7 +1191,7 @@ local TitleSub = Instance.new("TextLabel")
 TitleSub.Size = UDim2.new(1, -120, 0, 16 * UIScale)
 TitleSub.Position = UDim2.new(0, 18, 0, 32)
 TitleSub.BackgroundTransparency = 1
-TitleSub.Text = "プレイヤーESP // Игрок ESP"
+TitleSub.Text = "Paint or Seek | Premium"
 TitleSub.TextColor3 = Color3.fromRGB(80, 80, 80)
 TitleSub.TextSize = 9 * UIScale
 TitleSub.Font = Enum.Font.Gotham
@@ -1437,39 +1456,32 @@ local function MakeSlider(parent, text, key, min, max, suffix)
     return f
 end
 
--- 3SP T4B
-MakeToggle(ESPContent, "ESP Master", "ESP_Enabled", "Aktifkan semua ESP")
-MakeToggle(ESPContent, "Line ESP", "Line_ESP", "Garis ke player")
-MakeToggle(ESPContent, "Box ESP", "Box_ESP", "Kotak di sekitar player")
-MakeToggle(ESPContent, "Name ESP", "Name_ESP", "Nama player")
-MakeToggle(ESPContent, "Distance ESP", "Distance_ESP", "Jarak ke player")
-MakeToggle(ESPContent, "Health ESP", "Health_ESP", "Health bar")
-MakeSlider(ESPContent, "Max Distance", "MaxDistance", 50, 2000, "m")
+-- ESP Tab
+MakeToggle(ESPContent, "ESP Master", "ESP_Enabled", "Show all players")
 
--- C0MB4T T4B - Auto Kill (renamed dari Kill Aura)
-MakeToggle(CombatContent, "Auto Kill", "AutoKill_Enabled", "Auto attack hider // オートキル // Авто Убийство")
-MakeToggle(CombatContent, "Fast Kill", "FastKill", "Kill instant with tool")
-MakeSlider(CombatContent, "Auto Kill Radius", "AutoKill_Radius", 5, 50, " studs")
-MakeSlider(CombatContent, "Auto Kill Delay", "AutoKill_Delay", 0.01, 1, "s")
-MakeToggle(CombatContent, "Teleport Hider", "TeleportHider_Enabled", "Teleport ke hider")
+-- Combat Tab
+MakeToggle(CombatContent, "Auto Kill", "AutoKill_Enabled", "Auto teleport + swing at hiders")
+MakeSlider(CombatContent, "Kill Radius", "AutoKill_Radius", 5, 50, " studs")
+MakeSlider(CombatContent, "Kill Delay", "AutoKill_Delay", 0.05, 1, "s")
+MakeToggle(CombatContent, "Teleport Hider", "TeleportHider_Enabled", "Teleport to hiders")
 MakeSlider(CombatContent, "Teleport Delay", "TeleportHider_Delay", 0.5, 5, "s")
-MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Kabur otomatis dari Seeker")
+MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Auto run from seekers")
 MakeSlider(CombatContent, "Safe Distance", "SafeDistance", 10, 60, " studs")
-MakeToggle(CombatContent, "Seeker Detector", "SeekerDetector", "Alert kalau Seeker dekat")
+MakeToggle(CombatContent, "Seeker Detector", "SeekerDetector", "Alert when seeker near")
 MakeSlider(CombatContent, "Detector Range", "DetectorRange", 50, 200, " studs")
 
--- M1SC T4B
-MakeToggle(MiscContent, "Auto Collect Coin", "AutoCoin_Enabled", "Auto ambil coin")
-MakeToggle(MiscContent, "Coin Bypass TP", "CoinBypass", "Collect tanpa teleport")
+-- Misc Tab
+MakeToggle(MiscContent, "Auto Collect Coin", "AutoCoin_Enabled", "Auto collect coins")
+MakeToggle(MiscContent, "Coin Bypass", "CoinBypass", "Collect without teleport")
 MakeSlider(MiscContent, "Coin Delay", "AutoCoin_Delay", 0.01, 1, "s")
 
--- PL4Y3R T4B
-MakeToggle(PlayerContent, "Speed Hack", "SpeedHack", "Lari cepat // スピード // Скорость")
+-- Player Tab
+MakeToggle(PlayerContent, "Speed Hack", "SpeedHack", "Fast run")
 MakeSlider(PlayerContent, "Speed Value", "SpeedValue", 16, 500, "")
-MakeToggle(PlayerContent, "Jump Hack", "JumpHack", "Lompat tinggi // ジャンプ // Прыжок")
+MakeToggle(PlayerContent, "Jump Hack", "JumpHack", "High jump")
 MakeSlider(PlayerContent, "Jump Power", "JumpValue", 50, 300, "")
 
--- DR4G M3NU
+-- Drag menu
 local dragM = false
 local dragSP = nil
 local dragMP = nil
@@ -1495,16 +1507,16 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- T0GGL3 M3NU BUTT0N
+-- Toggle menu button
 local ToggleBtnSize = IsMobile and UDim2.new(0, 55, 0, 55) or UDim2.new(0, 50, 0, 50)
 local MenuBtn = Instance.new("TextButton")
 MenuBtn.Name = "MenuToggle"
 MenuBtn.Size = ToggleBtnSize
 MenuBtn.Position = UDim2.new(0, 18, 0.5, -ToggleBtnSize.Y.Offset / 2)
 MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-MenuBtn.Text = "👁️"
+MenuBtn.Text = "XY"
 MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MenuBtn.TextSize = 26 * UIScale
+MenuBtn.TextSize = 20 * UIScale
 MenuBtn.Font = Enum.Font.GothamBlack
 MenuBtn.Parent = SG
 
@@ -1526,7 +1538,7 @@ BtnGlow.Parent = MenuBtn
 
 task.spawn(function()
     while MenuBtn.Parent do
-        TweenService:Create(BtnGlow, TweenInfo.new(        1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.4}):Play()
+        TweenService:Create(BtnGlow, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.4}):Play()
         task.wait(1.5)
         TweenService:Create(BtnGlow, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.8}):Play()
         task.wait(1.5)
@@ -1538,12 +1550,10 @@ MenuBtn.MouseButton1Click:Connect(function()
     if Main.Visible then
         MenuBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         MenuBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-        BtnStroke.Color = Color3.fromRGB(255, 255, 255)
         TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = MenuSize}):Play()
     else
         MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
         MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        BtnStroke.Color = Color3.fromRGB(255, 255, 255)
     end
 end)
 
@@ -1559,9 +1569,7 @@ CloseBtn.MouseButton1Click:Connect(function()
     MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 end)
 
--- ============================================
--- K3YB04RD SH0RTCUT5
--- ============================================
+-- Keyboard shortcuts
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     
@@ -1583,7 +1591,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
 end)
 
 -- ============================================
--- 4NT1-D3T3CT10N
+-- ANTI-DETECTION
 -- ============================================
 pcall(function()
     local mt = getrawmetatable(game)
@@ -1594,7 +1602,7 @@ pcall(function()
             local m = getnamecallmethod()
             if m == "FindFirstChild" or m == "WaitForChild" then
                 local a = {...}
-                if a[1] and (a[1]:match("ESP") or a[1]:match("Xyin") or a[1]:match("Nano")) then
+                if a[1] and (a[1]:match("ESP") or a[1]:match("Xyin") or a[1]:match("XYIN") or a[1]:match("Hub")) then
                     return nil
                 end
             end
@@ -1605,71 +1613,64 @@ pcall(function()
 end)
 
 -- ============================================
--- N0T1F1C4T10N - C0MPL3T3 F1X
+-- NOTIFICATION - BOTTOM RIGHT
 -- ============================================
-task.delay(5, function()
-    local N = Instance.new("Frame")
-    N.Size = UDim2.new(0, 400 * UIScale, 0, 80 * UIScale)
-    N.Position = UDim2.new(0.5, -200 * UIScale, 0, -95)
-    N.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
-    N.BorderSizePixel = 0
-    N.Parent = SG
-    
-    Instance.new("UICorner", N).CornerRadius = UDim.new(0, 16)
-    
-    local NS = Instance.new("UIStroke")
-    NS.Color = Color3.fromRGB(255, 255, 255)
-    NS.Thickness = 1
-    NS.Parent = N
-    
-    local NT = Instance.new("TextLabel")
-    NT.Size = UDim2.new(1, -20, 0.35, 0)
-    NT.Position = UDim2.new(0, 10, 0, 8)
-    NT.BackgroundTransparency = 1
-    NT.Text = "Xy1nESP v6.2 Auto Kill G4C0R!"
-    NT.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NT.TextSize = 15 * UIScale
-    NT.Font = Enum.Font.GothamBlack
-    NT.Parent = N
-    
-    local NA = Instance.new("TextLabel")
-    NA.Size = UDim2.new(1, -20, 0.3, 0)
-    NA.Position = UDim2.new(0, 10, 0.35, 2)
-    NA.BackgroundTransparency = 1
-    NA.Text = "by @RukanooXD_YT | 完了 | Готово"
-    NA.TextColor3 = Color3.fromRGB(180, 180, 180)
-    NA.TextSize = 11 * UIScale
-    NA.Font = Enum.Font.GothamBold
-    NA.Parent = N
-    
-    local NK = Instance.new("TextLabel")
-    NK.Size = UDim2.new(1, -20, 0.35, 0)
-    NK.Position = UDim2.new(0, 10, 0.65, 0)
-    NK.BackgroundTransparency = 1
-    NK.Text = "R1ghtAlt:M3nu | 1ns3rt:ESP | H0m3:AutoK1ll | PgUp:TP | 3nd:C01n | D3l:Sp33d"
-    NK.TextColor3 = Color3.fromRGB(100, 100, 100)
-    NK.TextSize = 9 * UIScale
-    NK.Font = Enum.Font.Gotham
-    NK.Parent = N
-    
-    N:TweenPosition(UDim2.new(0.5, -200 * UIScale, 0, 20), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.6)
-    
-    task.delay(6, function()
-        N:TweenPosition(UDim2.new(0.5, -200 * UIScale, 0, -95), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.5)
-        task.wait(0.6)
-        N:Destroy()
-    end)
+local Notif = Instance.new("Frame")
+Notif.Size = UDim2.new(0, 350 * UIScale, 0, 70 * UIScale)
+Notif.Position = UDim2.new(1, 10, 1, 10)
+Notif.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+Notif.BorderSizePixel = 0
+Notif.Parent = SG
+Instance.new("UICorner", Notif).CornerRadius = UDim.new(0, 14)
+
+local NotifStroke = Instance.new("UIStroke")
+NotifStroke.Color = Color3.fromRGB(255, 255, 255)
+NotifStroke.Thickness = 1
+NotifStroke.Parent = Notif
+
+local NotifTitle = Instance.new("TextLabel")
+NotifTitle.Size = UDim2.new(1, -20, 0, 22 * UIScale)
+NotifTitle.Position = UDim2.new(0, 10, 0, 6)
+NotifTitle.BackgroundTransparency = 1
+NotifTitle.Text = "KAMU TELAH MEMASUKI SCRIPT XYINHUB"
+NotifTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+NotifTitle.TextSize = 13 * UIScale
+NotifTitle.Font = Enum.Font.GothamBlack
+NotifTitle.Parent = Notif
+
+local NotifInfo = Instance.new("TextLabel")
+NotifInfo.Size = UDim2.new(1, -20, 0, 18 * UIScale)
+NotifInfo.Position = UDim2.new(0, 10, 0, 28)
+NotifInfo.BackgroundTransparency = 1
+NotifInfo.Text = "Username Roblox : " .. LocalPlayer.Name .. " | ID : " .. LocalPlayer.UserId
+NotifInfo.TextColor3 = Color3.fromRGB(180, 180, 180)
+NotifInfo.TextSize = 10 * UIScale
+NotifInfo.Font = Enum.Font.GothamBold
+NotifInfo.Parent = Notif
+
+local NotifVer = Instance.new("TextLabel")
+NotifVer.Size = UDim2.new(1, -20, 0, 16 * UIScale)
+NotifVer.Position = UDim2.new(0, 10, 0, 46)
+NotifVer.BackgroundTransparency = 1
+NotifVer.Text = "XYINHUB v7.0 | Paint or Seek | @RukanooXD_YT"
+NotifVer.TextColor3 = Color3.fromRGB(100, 100, 100)
+NotifVer.TextSize = 9 * UIScale
+NotifVer.Font = Enum.Font.Gotham
+NotifVer.Parent = Notif
+
+Notif:TweenPosition(UDim2.new(1, -360 * UIScale, 1, -80 * UIScale), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.5)
+
+task.delay(8, function()
+    Notif:TweenPosition(UDim2.new(1, 10, 1, 10), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.4)
+    task.wait(0.5)
+    Notif:Destroy()
 end)
 
 -- ============================================
--- F1N4L PR1NT
+-- FINAL PRINT
 -- ============================================
-print("[N4n0Xy1n] Xy1nESP v6.2 Auto Kill Edition L04D3D")
-print("[N4n0Xy1n] - .... . / .... .- -.-. -.- / .. ... / .-. . .- .-..")
-print("[N4n0Xy1n] プレイヤーESP v6.2 オートキル ロード完了")
-print("[N4n0Xy1n] Игрок ESP v6.2 Авто Убийство загружен")
-print("[N4n0Xy1n] @RukanooXD_YT")
-print("[N4n0Xy1n] R0l3: " .. GetRole(LocalPlayer))
-print("[N4n0Xy1n] D3v1c3: " .. (IsMobile and "M0b1l3" or "L4pt0p"))
-print("[N4n0Xy1n] F1x3s: AutoSafe, AutoCoin, Speed, Jump, AutoKill")
-
+print("[XYINHUB] v7.0 Paint or Seek Edition LOADED")
+print("[XYINHUB] User: " .. LocalPlayer.Name .. " | ID: " .. LocalPlayer.UserId)
+print("[XYINHUB] Role: " .. GetRole(LocalPlayer))
+print("[XYINHUB] Device: " .. (IsMobile and "Mobile" or "PC"))
+print("[XYINHUB] @RukanooXD_YT")
