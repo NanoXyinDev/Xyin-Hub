@@ -1,8 +1,9 @@
 -- ============================================
--- N4n0Xy1n Xy1nESP v6.0 - YT 3D1T10N
+-- N4n0Xy1n Xy1nESP v6.1 - YT BUG FIX EDITION
 -- @RukanooXD_YT // Pembuat Script
 -- F34tur3s: ESP, K1ll 4ur4, T3l3p0rt, Byp4ss C01n,
 -- Sp33d, Jump, 4ut0 S4f3, S33k3r D3t3ct0r, M0d3rn B&W UI
+-- BUG FIX: AutoSafe, AutoCoin, Speed, Jump
 -- Y0uTub3 R34dy - C1n3m4t1c & Pr0f3ss10n4l
 -- L4ngu4g3: 1nd0 + 3ngl15h + J4p4n353 + Ru5514n
 -- ============================================
@@ -14,6 +15,7 @@ local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 
 -- ============================================
 -- D3V1C3 D3T3CT10N
@@ -56,16 +58,16 @@ local Settings = {
     TeleportHider_Delay = 1.5,
     -- C01n Byp4ss
     AutoCoin_Enabled = false,
-    AutoCoin_Delay = 0.1,
+    AutoCoin_Delay = 0.05,
     CoinBypass = true,
-    -- Sp33d & Jump
+    -- Sp33d & Jump - FIX
     SpeedHack = false,
     SpeedValue = 100,
     JumpHack = false,
     JumpValue = 150,
     -- 4ut0 S4f3 - S33k3r D3t3ct10n
     AutoSafe = false,
-    SafeDistance = 40,
+    SafeDistance = 25,
     -- S33k3r D3t3ct0r
     SeekerDetector = false,
     DetectorRange = 100,
@@ -141,11 +143,9 @@ local function GetRole(p)
     local c = p.Character
     if not c then return "Unknown" end
     
-    -- M3th0d 1: 4ttribut3s
     if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") then return "Seeker" end
     if c:FindFirstChild("Hider") or c:FindFirstChild("IsHider") then return "Hider" end
     
-    -- M3th0d 2: F0ld3r5
     for _, o in ipairs(workspace:GetChildren()) do
         if o:IsA("Folder") then
             local n = o.Name:lower()
@@ -154,14 +154,12 @@ local function GetRole(p)
         end
     end
     
-    -- M3th0d 3: T34m
     if p.Team then
         local tn = p.Team.Name:lower()
         if tn:match("seeker") or tn:match("hunter") or tn:match("tagger") then return "Seeker" end
         if tn:match("hider") or tn:match("hidden") then return "Hider" end
     end
     
-    -- M3th0d 4: L34d3rst4ts
     if p:FindFirstChild("leaderstats") then
         for _, s in ipairs(p.leaderstats:GetChildren()) do
             local sn = s.Name:lower()
@@ -171,10 +169,8 @@ local function GetRole(p)
         end
     end
     
-    -- M3th0d 5: W34p0n ch3ck (S33K3R H4V3 W34P0N)
     if HasWeapon(p) then return "Seeker" end
     
-    -- M3th0d 6: B1llb04rd GUI
     for _, g in ipairs(c:GetDescendants()) do
         if g:IsA("BillboardGui") or g:IsA("TextLabel") then
             local txt = ""
@@ -184,16 +180,13 @@ local function GetRole(p)
         end
     end
     
-    -- M3th0d 7: W4lksp33d
     local hum = c:FindFirstChildOfClass("Humanoid")
     if hum and hum.WalkSpeed > 30 then return "Seeker" end
     
-    -- F1X: F0r l0c4l pl4y3r - ch3ck w34p0n
     if p == LocalPlayer then
         return HasWeapon(p) and "Seeker" or "Hider"
     end
     
-    -- F1X: F0r 0th3r5 - 1f l0c4l 1s s33k3r, th3y'r3 h1d3r
     local myRole = GetRole(LocalPlayer)
     if myRole == "Seeker" then return "Hider" end
     if myRole == "Hider" then return "Seeker" end
@@ -287,7 +280,6 @@ local function UpdateESP()
         local bx = pos.X - w / 2 + BoxOffset.X
         local by = top.Y + BoxOffset.Y
         
-        -- Line
         if Settings.Line_ESP and o.Line then
             local origin
             if Settings.LineOrigin == "Bottom" then origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
@@ -299,7 +291,6 @@ local function UpdateESP()
             o.Line.Visible = true
         else pcall(function() o.Line.Visible = false end) end
         
-        -- Box
         if Settings.Box_ESP and o.Box and o.BoxFill then
             o.Box.Size = Vector2.new(w, h)
             o.Box.Position = Vector2.new(bx, by)
@@ -314,7 +305,6 @@ local function UpdateESP()
             pcall(function() o.BoxFill.Visible = false end)
         end
         
-        -- Name
         if Settings.Name_ESP and o.Name then
             o.Name.Text = p.Name .. " [" .. role .. "]"
             o.Name.Position = Vector2.new(pos.X, top.Y - 18)
@@ -322,7 +312,6 @@ local function UpdateESP()
             o.Name.Visible = true
         else pcall(function() o.Name.Visible = false end) end
         
-        -- Role
         if o.RoleTag then
             o.RoleTag.Text = role
             o.RoleTag.Position = Vector2.new(pos.X, top.Y - 32)
@@ -330,7 +319,6 @@ local function UpdateESP()
             o.RoleTag.Visible = true
         end
         
-        -- Distance
         if Settings.Distance_ESP and o.Dist and lHRP then
             local d = math.floor((hrp.Position - lHRP.Position).Magnitude)
             o.Dist.Text = d .. "m"
@@ -338,7 +326,6 @@ local function UpdateESP()
             o.Dist.Visible = true
         else pcall(function() o.Dist.Visible = false end) end
         
-        -- Health
         if Settings.Health_ESP and o.HP and o.HPBar and o.HPBarBG then
             o.HP.Text = math.floor(hp) .. "/" .. math.floor(maxHp)
             o.HP.Position = Vector2.new(pos.X, bot.Y + 18)
@@ -377,7 +364,6 @@ local function StartKillAura()
         local lHRP = lChar and GetHRP(LocalPlayer)
         if not lHRP then return end
         
-        -- 4ut0 3qu1p t00l 1f n0t h0ld1ng
         local tool = nil
         for _, c in ipairs(lChar:GetChildren()) do
             if c:IsA("Tool") then tool = c break end
@@ -407,11 +393,9 @@ local function StartKillAura()
             
             local dist = (hrp.Position - lHRP.Position).Magnitude
             if dist <= Settings.KillAura_Radius then
-                -- F4st k1ll
                 pcall(function() hum:TakeDamage(100) end)
                 pcall(function() hum.Health = 0 end)
                 
-                -- F1r3 t0uch
                 pcall(function()
                     for _, part in ipairs(lChar:GetDescendants()) do
                         if part:IsA("BasePart") then
@@ -443,21 +427,25 @@ local function StartKillAura()
 end
 
 -- ============================================
--- 4UT0 S4F3 - K4BUR D4R1 S33K3R
+-- 4UT0 S4F3 - FIX K4BUR D4R1 S33K3R
 -- ============================================
 local SafeConn = nil
+local LastSafeTeleport = 0
 
 local function StartAutoSafe()
     if SafeConn then return end
     SafeConn = RunService.Heartbeat:Connect(function()
         if not Settings.AutoSafe then return end
-        if AmISeeker() then return end -- S33k3r g4 p3rlu k4bur
+        if AmISeeker() then return end
         
         local lChar = LocalPlayer.Character
         local lHRP = lChar and GetHRP(LocalPlayer)
-        if not lHRP then return end
+        local lHum = lChar and lChar:FindFirstChildOfClass("Humanoid")
+        if not lHRP or not lHum then return end
         
-        -- Ch3ck 1f 4ny s33k3r 1s n34rby
+        -- C00ld0wn 0.5s t0 pr3v3nt sp4m t3l3p0rt
+        if tick() - LastSafeTeleport < 0.5 then return end
+        
         local nearestSeeker = nil
         local nearestDist = math.huge
         
@@ -478,15 +466,32 @@ local function StartAutoSafe()
         
         -- K4bur 1f s33k3r 1s cl0s3
         if nearestSeeker and nearestDist < Settings.SafeDistance then
+            -- FIX: C4lcu14t3 4w4y d1r3ct10n w1th Y pr3s3rv3d
             local awayDir = (lHRP.Position - nearestSeeker.Position).Unit
-            local safePos = lHRP.Position + awayDir * 50
-            -- M4k3 sur3 w3 d0n't t3l3p0rt 0ut 0f b0unds
+            -- FIX: Sh0rt3r t3l3p0rt d1st4nc3 (15-20 studs) t0 4v01d v01d
+            local safePos = lHRP.Position + awayDir * 20
+            -- FIX: K33p Y 4b0v3 gr0und
             safePos = Vector3.new(
                 math.clamp(safePos.X, -500, 500),
-                math.clamp(safePos.Y, 0, 500),
+                math.max(safePos.Y, 5),
                 math.clamp(safePos.Z, -500, 500)
             )
+            
+            -- FIX: Uns1t b3f0r3 t3l3p0rt
+            pcall(function() lHum.Sit = false end)
+            pcall(function() lHum.PlatformStand = false end)
+            
+            -- FIX: T3l3p0rt w1th CFr4m3 + V3l0c1ty r3s3t
             lHRP.CFrame = CFrame.new(safePos)
+            lHRP.Velocity = Vector3.new(0, 0, 0)
+            lHRP.RotVelocity = Vector3.new(0, 0, 0)
+            
+            -- FIX: M0v3T0 t0 pr3v3nt st4ck1ng
+            pcall(function()
+                lHum:MoveTo(safePos + awayDir * 5)
+            end)
+            
+            LastSafeTeleport = tick()
         end
     end)
 end
@@ -554,14 +559,12 @@ local function StartSeekerDetector()
             local screenPos = Camera:WorldToViewportPoint(seekerPos)
             local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
             
-            -- Fl4sh1ng 4l3rt
             local flash = math.abs(math.sin(tick() * 8))
             DetectorText.Color = Color3.fromRGB(255, 255 * (1 - flash), 255 * (1 - flash))
             DetectorText.Text = "⚠️ S33K3R " .. nearestSeeker.Name .. " " .. math.floor(nearestDist) .. "m ⚠️"
             DetectorText.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y - 120)
             DetectorText.Visible = true
             
-            -- L1n3 t0 s33k3r
             DetectorLine.From = center
             DetectorLine.To = Vector2.new(screenPos.X, screenPos.Y)
             DetectorLine.Color = Color3.fromRGB(255, 255 * (1 - flash), 255 * (1 - flash))
@@ -574,31 +577,93 @@ local function StartSeekerDetector()
 end
 
 -- ============================================
--- SP33D & JUMP H4CK
+-- SP33D H4CK - FIX 3X4CT V4LU3
 -- ============================================
 local SpeedConn = nil
-local JumpConn = nil
+local SpeedPropConn = nil
 
 local function StartSpeedHack()
     if SpeedConn then return end
-    SpeedConn = RunService.Heartbeat:Connect(function()
+    
+    -- L4y3r 1: R3nd3rSt3pp3d f0r f4st 0v3rwr1t3
+    SpeedConn = RunService.RenderStepped:Connect(function()
         if not Settings.SpeedHack then return end
         local c = LocalPlayer.Character
         local h = c and c:FindFirstChildOfClass("Humanoid")
-        if h then
-            h.WalkSpeed = math.clamp(Settings.SpeedValue, 16, 1000)
+        if h and h.WalkSpeed ~= Settings.SpeedValue then
+            h.WalkSpeed = Settings.SpeedValue
+        end
+    end)
+    
+    -- L4y3r 2: Pr0p3rtyCh4ng3dS1gn4l f0r 4nt1-ch34t r3s1st4nc3
+    local c = LocalPlayer.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    if h then
+        SpeedPropConn = h:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if not Settings.SpeedHack then return end
+            if h.WalkSpeed ~= Settings.SpeedValue then
+                h.WalkSpeed = Settings.SpeedValue
+            end
+        end)
+    end
+    
+    -- R3c0nn3ct 0n ch4r4ct3r ch4ng3
+    LocalPlayer.CharacterAdded:Connect(function(newChar)
+        task.wait(0.5)
+        local newHum = newChar:FindFirstChildOfClass("Humanoid")
+        if newHum then
+            if SpeedPropConn then SpeedPropConn:Disconnect() end
+            SpeedPropConn = newHum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                if not Settings.SpeedHack then return end
+                if newHum.WalkSpeed ~= Settings.SpeedValue then
+                    newHum.WalkSpeed = Settings.SpeedValue
+                end
+            end)
         end
     end)
 end
 
+-- ============================================
+-- JUMP H4CK - FIX M0D3RN R0BL0X
+-- ============================================
+local JumpConn = nil
+local JumpPropConn = nil
+
 local function StartJumpHack()
     if JumpConn then return end
-    JumpConn = RunService.Heartbeat:Connect(function()
+    
+    -- FIX: M0d3rn R0bl0x us3s JumpH31ght, n0t JumpP0w3r
+    JumpConn = RunService.RenderStepped:Connect(function()
         if not Settings.JumpHack then return end
         local c = LocalPlayer.Character
         local h = c and c:FindFirstChildOfClass("Humanoid")
         if h then
-            h.JumpPower = math.clamp(Settings.JumpValue, 50, 300)
+            -- FIX: S3t JumpH31ght 1nst34d 0f JumpP0w3r
+            pcall(function()
+                h.JumpHeight = Settings.JumpValue / 10 -- Sc4l3 t0 h31ght
+                h.UseJumpHeight = true
+            end)
+            -- F4llb4ck: 1f JumpH31ght n0t 4v41l4bl3, us3 0ld JumpP0w3r
+            pcall(function()
+                if h:FindFirstChild("JumpPower") then
+                    h.JumpPower = Settings.JumpValue
+                end
+            end)
+        end
+    end)
+    
+    -- FIX: 4ut0-jump wh3n sp4c3 pr3ss3d w1th 1ncr34s3d h31ght
+    UserInputService.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        if not Settings.JumpHack then return end
+        if input.KeyCode == Enum.KeyCode.Space or input.UserInputType == Enum.UserInputType.Touch then
+            local c = LocalPlayer.Character
+            local h = c and c:FindFirstChildOfClass("Humanoid")
+            if h and h:GetState() ~= Enum.HumanoidStateType.Jumping then
+                pcall(function()
+                    h:ChangeState(Enum.HumanoidStateType.Jumping)
+                end)
+            end
         end
     end)
 end
@@ -656,56 +721,95 @@ local function StartTP()
 end
 
 -- ============================================
--- 4UT0 C01N - F1X3D (SK1P 1NV1T3 FR13ND)
+-- 4UT0 C01N - FIX T0T4L
 -- ============================================
 local CoinConn = nil
-
--- Bl4ckl1st 0f n0n-c01n 0bj3ct n4m3s
 local CoinBlacklist = {
     "invite", "friend", "gui", "button", "frame", "label", "menu", "shop", "settings",
     "inventory", "taunt", "pose", "lock", "paint", "troll", "become", "tiny", "giant",
-    "portal", "spawn", "lobby", "home", "base", "checkpoint"
+    "portal", "spawn", "lobby", "home", "base", "checkpoint", "chest", "crate", "box"
 }
 
+local CachedCoins = {}
+local LastCoinScan = 0
+
 local function IsRealCoin(obj)
+    if not obj or not obj.Parent then return false end
     local n = obj.Name:lower()
     for _, bl in ipairs(CoinBlacklist) do
         if n:match(bl) then return false end
     end
-    -- M4k3 sur3 1t h4s t0uch 1nt3r3st
+    -- Ch3ck 1f 4lr34dy c0ll3ct3d
+    if obj:FindFirstChild("Collected") then return false end
     return obj:FindFirstChildWhichIsA("TouchInterest") ~= nil
 end
 
-local function FindCoins()
-    local coins = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
-            local n = obj.Name:lower()
-            if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
-               n:match("gem") or n:match("token") or n:match("collect") or n:match("point") or
-               n:match("star") or n:match("reward") or n:match("drop") or n:match("pickup") or
-               n:match("loot") or n:match("bonus") then
-                if IsRealCoin(obj) then
-                    local y = obj.Position.Y
-                    if y > -100 and y < 500 then
-                        table.insert(coins, obj)
+local function ScanCoinsFast()
+    -- FIX: C4ch3 sc4n 3v3ry 2 s3c0nds 1nst34d 0f 3v3ry fr4m3
+    if tick() - LastCoinScan < 2 then return CachedCoins end
+    
+    CachedCoins = {}
+    -- FIX: Us3 G3tP4rtB0unds1nR4d1us f0r f4st3r d3t3ct10n
+    local lChar = LocalPlayer.Character
+    local lHRP = lChar and GetHRP(LocalPlayer)
+    if not lHRP then return CachedCoins end
+    
+    local searchPos = lHRP.Position
+    local success, parts = pcall(function()
+        return Workspace:GetPartBoundsInRadius(searchPos, 400)
+    end)
+    
+    if success and parts then
+        for _, part in ipairs(parts) do
+            if part:IsA("BasePart") or part:IsA("MeshPart") then
+                local n = part.Name:lower()
+                if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
+                   n:match("gem") or n:match("token") or n:match("collect") or n:match("point") or
+                   n:match("star") or n:match("reward") or n:match("drop") or n:match("pickup") or
+                   n:match("loot") or n:match("bonus") or n:match("candy") then
+                    if IsRealCoin(part) then
+                        table.insert(CachedCoins, part)
+                    end
+                end
+            end
+        end
+    else
+        -- F4llb4ck: Sl0w sc4n
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+                local n = obj.Name:lower()
+                if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
+                   n:match("gem") or n:match("token") or n:match("collect") then
+                    if IsRealCoin(obj) then
+                        table.insert(CachedCoins, obj)
                     end
                 end
             end
         end
     end
-    return coins
+    
+    LastCoinScan = tick()
+    return CachedCoins
 end
 
 -- R34l-t1m3 c01n d3t3ct10n
-workspace.DescendantAdded:Connect(function(obj)
+Workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("BasePart") or obj:IsA("MeshPart") then
         local n = obj.Name:lower()
         if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
            n:match("gem") or n:match("token") or n:match("collect") then
             if IsRealCoin(obj) then
-                -- N3w c01n d3t3ct3d
+                table.insert(CachedCoins, obj)
             end
+        end
+    end
+end)
+
+Workspace.DescendantRemoving:Connect(function(obj)
+    for i, coin in ipairs(CachedCoins) do
+        if coin == obj then
+            table.remove(CachedCoins, i)
+            break
         end
     end
 end)
@@ -719,51 +823,69 @@ local function StartCoin()
                 continue
             end
             
-            local coins = FindCoins()
+            local coins = ScanCoinsFast()
             local lChar = LocalPlayer.Character
             local lHRP = lChar and GetHRP(LocalPlayer)
             
             if lHRP then
-                for _, coin in ipairs(coins) do
+                for i = #coins, 1, -1 do
+                    local coin = coins[i]
                     if not Settings.AutoCoin_Enabled then break end
-                    if coin and coin.Parent and IsRealCoin(coin) then
-                        local dist = (coin.Position - lHRP.Position).Magnitude
-                        local cy = coin.Position.Y
-                        if dist < 400 and cy > -100 and cy < 500 then
-                            if Settings.CoinBypass then
-                                -- BYP4SS: C0ll3ct fr0m d1st4nc3
-                                pcall(function()
-                                    firetouchinterest(lHRP, coin, 0)
-                                    firetouchinterest(lHRP, coin, 1)
-                                    
-                                    for _, part in ipairs(lChar:GetDescendants()) do
-                                        if part:IsA("BasePart") then
-                                            firetouchinterest(part, coin, 0)
-                                            firetouchinterest(part, coin, 1)
-                                        end
+                    if not coin or not coin.Parent then
+                        table.remove(coins, i)
+                        continue
+                    end
+                    
+                    local dist = (coin.Position - lHRP.Position).Magnitude
+                    local cy = coin.Position.Y
+                    
+                    if dist < 300 and cy > -100 and cy < 500 then
+                        if Settings.CoinBypass then
+                            -- FIX: BYP4SS - M0v3 c01n t0 pl4y3r p0s + f1r3 t0uch
+                            pcall(function()
+                                -- St0r3 0r1g1n4l p0s
+                                local oldPos = coin.Position
+                                local oldCFrame = coin.CFrame
+                                
+                                -- M0v3 c01n t0 pl4y3r
+                                coin.CFrame = lHRP.CFrame
+                                task.wait(0.05)
+                                
+                                -- F1r3 t0uch w1th mult1pl3 p4rts
+                                for _, part in ipairs(lChar:GetDescendants()) do
+                                    if part:IsA("BasePart") then
+                                        firetouchinterest(part, coin, 0)
+                                        firetouchinterest(part, coin, 1)
                                     end
-                                    
-                                    -- M0v3 c01n t0 pl4y3r 1nst34d
-                                    if coin:FindFirstChildWhichIsA("TouchInterest") then
-                                        coin.CFrame = lHRP.CFrame
-                                        task.wait(0.03)
-                                    end
-                                end)
-                            else
-                                -- T3l3p0rt t0 c01n
-                                pcall(function()
-                                    lHRP.CFrame = coin.CFrame
-                                    task.wait(0.08)
-                                    firetouchinterest(lHRP, coin, 0)
-                                    firetouchinterest(lHRP, coin, 1)
-                                end)
-                            end
+                                end
+                                
+                                firetouchinterest(lHRP, coin, 0)
+                                firetouchinterest(lHRP, coin, 1)
+                                
+                                task.wait(0.05)
+                                
+                                -- R3st0r3 0r1g1n4l p0s 1f st1ll 3x1sts
+                                if coin and coin.Parent then
+                                    coin.CFrame = oldCFrame
+                                end
+                            end)
+                        else
+                            -- FIX: N0rm4l t3l3p0rt - cl0s3r d1st4nc3 + f4st3r
+                            pcall(function()
+                                local oldPos = lHRP.CFrame
+                                lHRP.CFrame = coin.CFrame * CFrame.new(0, 2, 0)
+                                task.wait(0.05)
+                                firetouchinterest(lHRP, coin, 0)
+                                firetouchinterest(lHRP, coin, 1)
+                                task.wait(0.05)
+                                lHRP.CFrame = oldPos
+                            end)
                         end
                     end
                     task.wait(Settings.AutoCoin_Delay)
                 end
             end
-            task.wait(0.3)
+            task.wait(0.2)
         end
     end)
 end
@@ -807,9 +929,7 @@ SG.Parent = CoreGui
 SG.ResetOnSpawn = false
 SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- ============================================
 -- W4T3RM4RK
--- ============================================
 local Watermark = Instance.new("TextLabel")
 Watermark.Size = UDim2.new(0, 200, 0, 20)
 Watermark.Position = UDim2.new(1, -210, 0, 10)
@@ -821,9 +941,7 @@ Watermark.Font = Enum.Font.GothamBold
 Watermark.TextTransparency = 0.3
 Watermark.Parent = SG
 
--- ============================================
--- L04D1NG SCR33N - C1N3M4T1C
--- ============================================
+-- L04D1NG SCR33N
 local Loading = Instance.new("Frame")
 Loading.Size = UDim2.new(1, 0, 1, 0)
 Loading.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -840,7 +958,6 @@ LG.Color = ColorSequence.new({
 LG.Rotation = 45
 LG.Parent = Loading
 
--- C1n3m4t1c p4rt1cl3s
 for i = 1, 25 do
     local p = Instance.new("Frame")
     p.Size = UDim2.new(0, math.random(1, 4), 0, math.random(1, 4))
@@ -863,7 +980,6 @@ for i = 1, 25 do
     end)
 end
 
--- T1tl3 w1th typ1ng 3ff3ct
 local Logo = Instance.new("TextLabel")
 Logo.Size = UDim2.new(0, 600, 0, 70 * UIScale)
 Logo.Position = UDim2.new(0.5, -300, 0.3, 0)
@@ -875,7 +991,6 @@ Logo.Font = Enum.Font.GothamBlack
 Logo.ZIndex = 10001
 Logo.Parent = Loading
 
--- Typ1ng 4n1m4t10n
 task.spawn(function()
     local text = "N4n0Xy1n"
     for i = 1, #text do
@@ -900,7 +1015,7 @@ local Sub = Instance.new("TextLabel")
 Sub.Size = UDim2.new(0, 600, 0, 25 * UIScale)
 Sub.Position = UDim2.new(0.5, -300, 0.38, 0)
 Sub.BackgroundTransparency = 1
-Sub.Text = "Xy1nESP v6.0 YT Edition // プレイヤーESP // Игрок ESP"
+Sub.Text = "Xy1nESP v6.1 YT Bug Fix // プレイヤーESP // Игрок ESP"
 Sub.TextColor3 = Color3.fromRGB(120, 120, 120)
 Sub.TextSize = 13 * UIScale
 Sub.Font = Enum.Font.Gotham
@@ -918,7 +1033,6 @@ Auth.Font = Enum.Font.GothamBold
 Auth.ZIndex = 10001
 Auth.Parent = Loading
 
--- B4r
 local BarBG = Instance.new("Frame")
 BarBG.Size = UDim2.new(0, 300 * UIScale, 0, 4)
 BarBG.Position = UDim2.new(0.5, -150 * UIScale, 0.5, 0)
@@ -958,15 +1072,14 @@ Status.Font = Enum.Font.Gotham
 Status.ZIndex = 10001
 Status.Parent = Loading
 
--- An1m4t3
 task.spawn(function()
     local stages = {
         {pct = 12, txt = "Initializing Core..."},
         {pct = 28, txt = "Loading ESP Engine..."},
         {pct = 42, txt = "Loading Combat Systems..."},
-        {pct = 56, txt = "Loading Speed & Jump..."},
-        {pct = 68, txt = "Loading Auto Safe..."},
-        {pct = 78, txt = "Loading Seeker Detector..."},
+        {pct = 56, txt = "Loading Speed & Jump Fix..."},
+        {pct = 68, txt = "Loading Auto Safe Fix..."},
+        {pct = 78, txt = "Loading Coin Fix..."},
         {pct = 88, txt = "Building Cinematic UI..."},
         {pct = 96, txt = "Finalizing..."},
         {pct = 100, txt = "Ready!"},
@@ -1000,9 +1113,7 @@ task.spawn(function()
     Loading:Destroy()
 end)
 
--- ============================================
--- M41N M3NU - PR0F3SS10N4L B&W
--- ============================================
+-- M41N M3NU
 local MenuSize = IsMobile and UDim2.new(0, 300, 0, 400) or UDim2.new(0, 400, 0, 540)
 local Main = Instance.new("Frame")
 Main.Name = "MainMenu"
@@ -1039,7 +1150,6 @@ Shadow.SliceCenter = Rect.new(23, 23, 277, 277)
 Shadow.ZIndex = -1
 Shadow.Parent = Main
 
--- T1tl3
 local Title = Instance.new("Frame")
 Title.Size = UDim2.new(1, 0, 0, 54 * UIScale)
 Title.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
@@ -1051,7 +1161,7 @@ local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(1, -120, 0, 28 * UIScale)
 TitleText.Position = UDim2.new(0, 18, 0, 6)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Xy1nESP v6.0"
+TitleText.Text = "Xy1nESP v6.1"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.TextSize = 18 * UIScale
 TitleText.Font = Enum.Font.GothamBlack
@@ -1091,7 +1201,6 @@ CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = Title
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
 
--- T4bs
 local TabFrame = Instance.new("Frame")
 TabFrame.Size = UDim2.new(1, -16, 0, 38 * UIScale)
 TabFrame.Position = UDim2.new(0, 8, 0, 56)
@@ -1161,9 +1270,6 @@ Tabs[1].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 Tabs[1].TextColor3 = Color3.fromRGB(0, 0, 0)
 ESPContent.Visible = true
 
--- ============================================
--- T0GGL3 CR34T0R
--- ============================================
 local function MakeToggle(parent, text, key, desc)
     local f = Instance.new("Frame")
     f.Size = UDim2.new(1, 0, 0, 58 * UIScale)
@@ -1243,9 +1349,6 @@ local function MakeToggle(parent, text, key, desc)
     return f
 end
 
--- ============================================
--- SL1D3R CR34T0R
--- ============================================
 local function MakeSlider(parent, text, key, min, max, suffix)
     local f = Instance.new("Frame")
     f.Size = UDim2.new(1, 0, 0, 62 * UIScale)
@@ -1334,9 +1437,7 @@ local function MakeSlider(parent, text, key, min, max, suffix)
     return f
 end
 
--- ============================================
 -- 3SP T4B
--- ============================================
 MakeToggle(ESPContent, "ESP Master", "ESP_Enabled", "Aktifkan semua ESP")
 MakeToggle(ESPContent, "Line ESP", "Line_ESP", "Garis ke player")
 MakeToggle(ESPContent, "Box ESP", "Box_ESP", "Kotak di sekitar player")
@@ -1345,9 +1446,7 @@ MakeToggle(ESPContent, "Distance ESP", "Distance_ESP", "Jarak ke player")
 MakeToggle(ESPContent, "Health ESP", "Health_ESP", "Health bar")
 MakeSlider(ESPContent, "Max Distance", "MaxDistance", 50, 2000, "m")
 
--- ============================================
 -- C0MB4T T4B
--- ============================================
 MakeToggle(CombatContent, "Kill Aura", "KillAura_Enabled", "Auto attack hider // キルオーラ // Килл Аура")
 MakeToggle(CombatContent, "Fast Kill", "FastKill", "Kill instant with tool")
 MakeSlider(CombatContent, "Kill Aura Radius", "KillAura_Radius", 5, 50, " studs")
@@ -1355,28 +1454,22 @@ MakeSlider(CombatContent, "Kill Aura Delay", "KillAura_Delay", 0.01, 1, "s")
 MakeToggle(CombatContent, "Teleport Hider", "TeleportHider_Enabled", "Teleport ke hider")
 MakeSlider(CombatContent, "Teleport Delay", "TeleportHider_Delay", 0.5, 5, "s")
 MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Kabur otomatis dari Seeker")
-MakeSlider(CombatContent, "Safe Distance", "SafeDistance", 20, 100, " studs")
+MakeSlider(CombatContent, "Safe Distance", "SafeDistance", 10, 60, " studs")
 MakeToggle(CombatContent, "Seeker Detector", "SeekerDetector", "Alert kalau Seeker dekat")
 MakeSlider(CombatContent, "Detector Range", "DetectorRange", 50, 200, " studs")
 
--- ============================================
 -- M1SC T4B
--- ============================================
 MakeToggle(MiscContent, "Auto Collect Coin", "AutoCoin_Enabled", "Auto ambil coin")
 MakeToggle(MiscContent, "Coin Bypass TP", "CoinBypass", "Collect tanpa teleport")
-MakeSlider(MiscContent, "Coin Delay", "AutoCoin_Delay", 0.05, 2, "s")
+MakeSlider(MiscContent, "Coin Delay", "AutoCoin_Delay", 0.01, 1, "s")
 
--- ============================================
 -- PL4Y3R T4B
--- ============================================
 MakeToggle(PlayerContent, "Speed Hack", "SpeedHack", "Lari cepat // スピード // Скорость")
-MakeSlider(PlayerContent, "Speed Value", "SpeedValue", 16, 1000, "")
+MakeSlider(PlayerContent, "Speed Value", "SpeedValue", 16, 500, "")
 MakeToggle(PlayerContent, "Jump Hack", "JumpHack", "Lompat tinggi // ジャンプ // Прыжок")
 MakeSlider(PlayerContent, "Jump Power", "JumpValue", 50, 300, "")
 
--- ============================================
 -- DR4G M3NU
--- ============================================
 local dragM = false
 local dragSP = nil
 local dragMP = nil
@@ -1402,9 +1495,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- ============================================
 -- T0GGL3 M3NU BUTT0N
--- ============================================
 local ToggleBtnSize = IsMobile and UDim2.new(0, 55, 0, 55) or UDim2.new(0, 50, 0, 50)
 local MenuBtn = Instance.new("TextButton")
 MenuBtn.Name = "MenuToggle"
@@ -1435,7 +1526,7 @@ BtnGlow.Parent = MenuBtn
 
 task.spawn(function()
     while MenuBtn.Parent do
-        TweenService:Create(BtnGlow, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.4}):Play()
+        TweenService:Create(BtnGlow, TweenInfo.new(        1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.4}):Play()
         task.wait(1.5)
         TweenService:Create(BtnGlow, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.8}):Play()
         task.wait(1.5)
@@ -1535,7 +1626,7 @@ task.delay(5, function()
     NT.Size = UDim2.new(1, -20, 0.35, 0)
     NT.Position = UDim2.new(0, 10, 0, 8)
     NT.BackgroundTransparency = 1
-    NT.Text = "Xy1nESP v6.0 YT G4C0R!"
+    NT.Text = "Xy1nESP v6.1 YT G4C0R!"
     NT.TextColor3 = Color3.fromRGB(255, 255, 255)
     NT.TextSize = 15 * UIScale
     NT.Font = Enum.Font.GothamBlack
@@ -1573,10 +1664,12 @@ end)
 -- ============================================
 -- F1N4L PR1NT
 -- ============================================
-print("[N4n0Xy1n] Xy1nESP v6.0 YT L04D3D")
+print("[N4n0Xy1n] Xy1nESP v6.1 YT Bug Fix L04D3D")
 print("[N4n0Xy1n] - .... . / .... .- -.-. -.- / .. ... / .-. . .- .-..")
-print("[N4n0Xy1n] プレイヤーESP v6.0 YT ロード完了")
-print("[N4n0Xy1n] Игрок ESP v6.0 YT загружен")
+print("[N4n0Xy1n] プレイヤーESP v6.1 バグ修正 ロード完了")
+print("[N4n0Xy1n] Игрок ESP v6.1 Исправление багов загружен")
 print("[N4n0Xy1n] @RukanooXD_YT")
 print("[N4n0Xy1n] R0l3: " .. GetRole(LocalPlayer))
 print("[N4n0Xy1n] D3v1c3: " .. (IsMobile and "M0b1l3" or "L4pt0p"))
+print("[N4n0Xy1n] F1x3s: AutoSafe, AutoCoin, Speed, Jump")
+
