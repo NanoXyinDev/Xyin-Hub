@@ -1,12 +1,11 @@
 -- ============================================
--- XYINHUB v7.1 - PAINT OR SEEK EDITION
+-- XYINHUB v7.2 - PAINT OR SEEK EDITION
 -- @RukanooXD_YT
 -- Game: Paint or Seek
--- Features: ESP, Auto Kill (Fast Touch), Auto Coin,
+-- Features: ESP, Auto Kill (Fixed), Auto Coin (Direct),
 -- Auto Safe, Seeker Detector, Speed, Jump, Noclip
--- FIX: Auto Kill only in round, distance check,
--- Fast Kill tool touch simulation, Noclip added
--- NO DELAY, INSTANT EXECUTE
+-- FIX: ESP no lobby, AutoKill no lobby, Fast Kill throw sim,
+-- AutoCoin direct no bypass, No delay, Accurate
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -36,8 +35,7 @@ local Settings = {
     TeleportHider_Enabled = false,
     TeleportHider_Delay = 1.5,
     AutoCoin_Enabled = false,
-    AutoCoin_Delay = 0.05,
-    CoinBypass = true,
+    AutoCoin_Delay = 0.01,
     SpeedHack = false,
     SpeedValue = 100,
     JumpHack = false,
@@ -50,7 +48,7 @@ local Settings = {
 }
 
 -- ============================================
--- GAME STATE DETECTION
+-- GAME STATE DETECTION — ENHANCED
 -- ============================================
 local GameState = {
     InRound = false,
@@ -61,43 +59,54 @@ local GameState = {
 
 local function UpdateGameState()
     local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if not playerGui then return end
+    local inRound = false
     
-    for _, gui in ipairs(playerGui:GetDescendants()) do
-        if gui:IsA("TextLabel") then
-            local text = gui.Text:lower()
-            if text:match("round ends") or text:match("hiders left") or text:match("seekers left") then
-                GameState.InRound = true
-                local timer = text:match("(%d+:%d+)")
-                if timer then GameState.RoundTimer = timer end
-                return
-            end
-            if text:match("you:%s*seeker") or text:match("you%s*seeker") then
-                GameState.MyRole = "Seeker"
-            elseif text:match("you:%s*hider") or text:match("you%s*hider") then
-                GameState.MyRole = "Hider"
+    if playerGui then
+        for _, gui in ipairs(playerGui:GetDescendants()) do
+            if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+                local text = gui.Text:lower()
+                if text:match("round ends") or text:match("hiders left") or text:match("seekers left") or text:match("hiders:%s*%d+") or text:match("seekers:%s*%d+") then
+                    inRound = true
+                    local timer = text:match("(%d+:%d+)")
+                    if timer then GameState.RoundTimer = timer end
+                end
+                if text:match("you:%s*seeker") or text:match("you%s*seeker") or text:match("role:%s*seeker") or text:match("team:%s*seeker") then
+                    GameState.MyRole = "Seeker"
+                elseif text:match("you:%s*hider") or text:match("you%s*hider") or text:match("role:%s*hider") or text:match("team:%s*hider") then
+                    GameState.MyRole = "Hider"
+                end
             end
         end
     end
     
+    -- Check workspace for round indicators
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("TextLabel") or obj:IsA("BillboardGui") then
             local txt = ""
             pcall(function() txt = obj.Text:lower() end)
-            if txt:match("hiders left") or txt:match("round ends") then
-                GameState.InRound = true
-                return
+            if txt:match("hiders left") or txt:match("round ends") or txt:match("seekers left") then
+                inRound = true
+                break
             end
         end
     end
     
-    GameState.InRound = false
+    -- Check if in lobby by looking for lobby-specific elements
+    local lobbyCheck = false
+    if Workspace:FindFirstChild("Lobby") or Workspace:FindFirstChild("Spawn") or Workspace:FindFirstChild("Intermission") then
+        -- Additional check: if no round indicators and lobby exists
+        if not inRound then
+            lobbyCheck = true
+        end
+    end
+    
+    GameState.InRound = inRound and not lobbyCheck
 end
 
 task.spawn(function()
     while true do
         UpdateGameState()
-        task.wait(0.5)
+        task.wait(0.3)
     end
 end)
 
@@ -133,7 +142,7 @@ local function CreateESPObjects(p)
 end
 
 -- ============================================
--- PLAYER CHECKS - PAINT OR SEEK ROLE DETECTION
+-- PLAYER CHECKS — ENHANCED
 -- ============================================
 local function IsAlive(p)
     local c = p.Character
@@ -152,12 +161,12 @@ local function GetPlayerRole(p)
     local playerGui = p:FindFirstChild("PlayerGui")
     if playerGui then
         for _, gui in ipairs(playerGui:GetDescendants()) do
-            if gui:IsA("TextLabel") then
+            if gui:IsA("TextLabel") or gui:IsA("TextButton") then
                 local text = gui.Text:lower()
-                if text:match("you:%s*seeker") or text:match("role:%s*seeker") or text:match("team:%s*seeker") then
+                if text:match("you:%s*seeker") or text:match("role:%s*seeker") or text:match("team:%s*seeker") or text:match("you%s*seeker") then
                     return "Seeker"
                 end
-                if text:match("you:%s*hider") or text:match("role:%s*hider") or text:match("team:%s*hider") then
+                if text:match("you:%s*hider") or text:match("role:%s*hider") or text:match("team:%s*hider") or text:match("you%s*hider") then
                     return "Hider"
                 end
             end
@@ -166,13 +175,13 @@ local function GetPlayerRole(p)
     
     local c = p.Character
     if c then
-        if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") then return "Seeker" end
-        if c:FindFirstChild("Hider") or c:FindFirstChild("IsHider") then return "Hider" end
+        if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") or c:FindFirstChild("SeekerTag") then return "Seeker" end
+        if c:FindFirstChild("Hider") or c:FindFirstChild("IsHider") or c:FindFirstChild("HiderTag") then return "Hider" end
         
         for _, tool in ipairs(c:GetChildren()) do
             if tool:IsA("Tool") then
                 local tn = tool.Name:lower()
-                if tn:match("paint") or tn:match("brush") or tn:match("bucket") or tn:match("seek") then
+                if tn:match("paint") or tn:match("brush") or tn:match("bucket") or tn:match("seek") or tn:match("throw") or tn:match("knife") then
                     return "Seeker"
                 end
             end
@@ -183,7 +192,7 @@ local function GetPlayerRole(p)
             for _, tool in ipairs(bp:GetChildren()) do
                 if tool:IsA("Tool") then
                     local tn = tool.Name:lower()
-                    if tn:match("paint") or tn:match("brush") or tn:match("bucket") or tn:match("seek") then
+                    if tn:match("paint") or tn:match("brush") or tn:match("bucket") or tn:match("seek") or tn:match("throw") or tn:match("knife") then
                         return "Seeker"
                     end
                 end
@@ -228,10 +237,11 @@ local function AmISeeker()
 end
 
 -- ============================================
--- ESP UPDATE
+-- ESP UPDATE — FIXED: NO LOBBY
 -- ============================================
 local function UpdateESP()
-    if not Settings.ESP_Enabled then
+    -- FORCE HIDE ALL if not in round
+    if not Settings.ESP_Enabled or not GameState.InRound then
         for _, o in pairs(ESPObjects) do
             for _, obj in pairs(o) do pcall(function() obj.Visible = false end) end
         end
@@ -346,10 +356,11 @@ local function UpdateESP()
 end
 
 -- ============================================
--- AUTO KILL - FAST TOOL TOUCH SIMULATION
--- FIX: Only in round, strict distance check
+-- AUTO KILL — FIXED: THROW SIMULATION
+-- Only works in round, strict distance, fast throw
 -- ============================================
 local AutoKillConn = nil
+local LastKillTime = 0
 
 local function GetTool()
     local c = LocalPlayer.Character
@@ -361,9 +372,12 @@ local function GetTool()
     if bp then
         for _, t in ipairs(bp:GetChildren()) do
             if t:IsA("Tool") then
-                c:FindFirstChildOfClass("Humanoid"):EquipTool(t)
-                task.wait(0.1)
-                return t
+                local hum = c:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum:EquipTool(t)
+                    task.wait(0.05)
+                    return t
+                end
             end
         end
     end
@@ -385,7 +399,6 @@ local function StartAutoKill()
         if not tool then return end
         
         local handle = tool:FindFirstChild("Handle")
-        if not handle then return end
         
         for _, p in ipairs(Players:GetPlayers()) do
             if p == LocalPlayer then continue end
@@ -393,46 +406,64 @@ local function StartAutoKill()
             
             local c = p.Character
             local hrp = c and GetHRP(p)
-            if not hrp then continue end
+            local hum = c and c:FindFirstChildOfClass("Humanoid")
+            if not hrp or not hum then continue end
             
             local dist = (hrp.Position - lHRP.Position).Magnitude
             if dist > Settings.AutoKill_Radius then continue end
             
-            -- FAST KILL: Move tool Handle to target HRP, fire touch, return
+            -- FAST THROW KILL: Teleport behind target, activate, return
+            -- This simulates the throw hitting the target
             pcall(function()
-                local oldCFrame = handle.CFrame
-                local oldParent = handle.Parent
+                local oldCFrame = lHRP.CFrame
                 
-                -- Teleport tool handle to target
-                handle.CFrame = hrp.CFrame * CFrame.new(0, 0, 2)
+                -- Teleport to optimal throw position (behind target)
+                local targetPos = hrp.Position
+                local targetLook = hrp.CFrame.LookVector
+                local throwPos = targetPos - (targetLook * 3) + Vector3.new(0, 1, 0)
                 
-                -- Activate tool
+                lHRP.CFrame = CFrame.new(throwPos, targetPos)
+                
+                -- Activate tool (throw)
                 tool:Activate()
                 
-                -- Fire touch with handle to target body parts
-                firetouchinterest(handle, hrp, 0)
-                firetouchinterest(handle, hrp, 1)
-                
-                -- Fire touch with all target parts
-                for _, part in ipairs(c:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        firetouchinterest(handle, part, 0)
-                        firetouchinterest(handle, part, 1)
+                -- If tool has handle, move it through target body for touch
+                if handle then
+                    local oldHandleCF = handle.CFrame
+                    handle.CFrame = hrp.CFrame
+                    firetouchinterest(handle, hrp, 0)
+                    firetouchinterest(handle, hrp, 1)
+                    
+                    -- Touch all target parts
+                    for _, part in ipairs(c:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            firetouchinterest(handle, part, 0)
+                            firetouchinterest(handle, part, 1)
+                        end
+                    end
+                    
+                    -- Touch with local parts too
+                    for _, part in ipairs(lChar:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            firetouchinterest(part, hrp, 0)
+                            firetouchinterest(part, hrp, 1)
+                        end
+                    end
+                    
+                    handle.CFrame = oldHandleCF
+                else
+                    -- No handle, use body parts directly
+                    for _, part in ipairs(lChar:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            firetouchinterest(part, hrp, 0)
+                            firetouchinterest(part, hrp, 1)
+                        end
                     end
                 end
                 
-                -- Fire touch with local body parts to target
-                for _, part in ipairs(lChar:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        firetouchinterest(part, hrp, 0)
-                        firetouchinterest(part, hrp, 1)
-                    end
-                end
-                
-                task.wait(0.03)
-                
-                -- Return handle
-                handle.CFrame = oldCFrame
+                -- Quick return to avoid detection
+                task.wait(0.02)
+                lHRP.CFrame = oldCFrame
             end)
             
             task.wait(Settings.AutoKill_Delay)
@@ -441,7 +472,7 @@ local function StartAutoKill()
 end
 
 -- ============================================
--- AUTO SAFE - ONLY DURING ROUND, FROM REAL SEEKERS
+-- AUTO SAFE — ENHANCED
 -- ============================================
 local SafeConn = nil
 local LastSafeTeleport = 0
@@ -458,7 +489,7 @@ local function StartAutoSafe()
         local lHum = lChar and lChar:FindFirstChildOfClass("Humanoid")
         if not lHRP or not lHum then return end
         
-        if tick() - LastSafeTeleport < 0.5 then return end
+        if tick() - LastSafeTeleport < 0.3 then return end
         
         local nearestSeeker = nil
         local nearestDist = math.huge
@@ -495,7 +526,7 @@ local function StartAutoSafe()
         
         if nearestSeeker and nearestDist < Settings.SafeDistance then
             local awayDir = (lHRP.Position - nearestSeeker.Position).Unit
-            local safePos = lHRP.Position + awayDir * 20
+            local safePos = lHRP.Position + awayDir * 25
             safePos = Vector3.new(
                 math.clamp(safePos.X, -500, 500),
                 math.max(safePos.Y, 5),
@@ -518,7 +549,7 @@ local function StartAutoSafe()
 end
 
 -- ============================================
--- SEEKER DETECTOR - ONLY DURING ROUND
+-- SEEKER DETECTOR — ENHANCED
 -- ============================================
 local DetectorText = CreateDrawing("Text", {
     Text = "",
@@ -695,7 +726,7 @@ local function StartJumpHack()
 end
 
 -- ============================================
--- NOCLIP - NEW FEATURE
+-- NOCLIP
 -- ============================================
 local NoclipConn = nil
 
@@ -766,14 +797,14 @@ local function StartTP()
 end
 
 -- ============================================
--- AUTO COIN - FIX TOTAL
+-- AUTO COIN — FIXED: DIRECT NO BYPASS, NO DELAY, ACCURATE
 -- ============================================
 local CoinConn = nil
 local CoinBlacklist = {
     "invite", "friend", "gui", "button", "frame", "label", "menu", "shop", "settings",
     "inventory", "taunt", "pose", "lock", "paint", "troll", "become", "tiny", "giant",
     "portal", "spawn", "lobby", "home", "base", "checkpoint", "chest", "crate", "box",
-    "camo", "sample", "fill", "brush", "bucket"
+    "camo", "sample", "fill", "brush", "bucket", "throw", "knife", "sword", "tool"
 }
 
 local CachedCoins = {}
@@ -786,13 +817,14 @@ local function IsRealCoin(obj)
         if n:match(bl) then return false end
     end
     if obj:FindFirstChild("Collected") then return false end
+    if obj:FindFirstChild("Disabled") then return false end
     local hasTouch = obj:FindFirstChildWhichIsA("TouchInterest") ~= nil
     local hasPrompt = obj:FindFirstChildWhichIsA("ProximityPrompt") ~= nil
     return hasTouch or hasPrompt
 end
 
 local function ScanCoins()
-    if tick() - LastCoinScan < 1 then return CachedCoins end
+    if tick() - LastCoinScan < 0.5 then return CachedCoins end
     
     CachedCoins = {}
     local lChar = LocalPlayer.Character
@@ -800,7 +832,7 @@ local function ScanCoins()
     if not lHRP then return CachedCoins end
     
     local success, parts = pcall(function()
-        return Workspace:GetPartBoundsInRadius(lHRP.Position, 300)
+        return Workspace:GetPartBoundsInRadius(lHRP.Position, 500)
     end)
     
     if success and parts then
@@ -810,10 +842,28 @@ local function ScanCoins()
                 if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
                    n:match("gem") or n:match("token") or n:match("collect") or n:match("point") or
                    n:match("star") or n:match("reward") or n:match("drop") or n:match("pickup") or
-                   n:match("loot") or n:match("bonus") or n:match("candy") then
+                   n:match("loot") or n:match("bonus") or n:match("candy") or n:match("xp") or
+                   n:match("exp") or n:match("orb") or n:match("sphere") then
                     if IsRealCoin(part) then
                         table.insert(CachedCoins, part)
                     end
+                end
+            end
+        end
+    end
+    
+    -- Also scan workspace children directly for named coins
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+            local n = obj.Name:lower()
+            if (n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or
+                n:match("gem") or n:match("token") or n:match("collectible")) and IsRealCoin(obj) then
+                local found = false
+                for _, c in ipairs(CachedCoins) do
+                    if c == obj then found = true break end
+                end
+                if not found then
+                    table.insert(CachedCoins, obj)
                 end
             end
         end
@@ -826,7 +876,7 @@ end
 Workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("BasePart") or obj:IsA("MeshPart") then
         local n = obj.Name:lower()
-        if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") then
+        if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or n:match("gem") then
             if IsRealCoin(obj) then
                 table.insert(CachedCoins, obj)
             end
@@ -848,7 +898,7 @@ local function StartCoin()
     CoinConn = task.spawn(function()
         while true do
             if not Settings.AutoCoin_Enabled then
-                task.wait(1)
+                task.wait(0.5)
                 continue
             end
             
@@ -866,56 +916,41 @@ local function StartCoin()
                     end
                     
                     local dist = (coin.Position - lHRP.Position).Magnitude
-                    if dist < 200 then
-                        if Settings.CoinBypass then
-                            pcall(function()
-                                local oldCFrame = coin.CFrame
-                                coin.CFrame = lHRP.CFrame
-                                task.wait(0.05)
-                                
-                                for _, part in ipairs(lChar:GetDescendants()) do
-                                    if part:IsA("BasePart") then
-                                        firetouchinterest(part, coin, 0)
-                                        firetouchinterest(part, coin, 1)
-                                    end
+                    if dist < 300 then
+                        -- DIRECT COLLECT: Teleport to coin, touch, return — NO DELAY
+                        pcall(function()
+                            local oldPos = lHRP.CFrame
+                            
+                            -- Direct teleport to coin
+                            lHRP.CFrame = coin.CFrame * CFrame.new(0, 1.5, 0)
+                            
+                            -- Immediate touch
+                            firetouchinterest(lHRP, coin, 0)
+                            firetouchinterest(lHRP, coin, 1)
+                            
+                            -- Touch with all character parts
+                            for _, part in ipairs(lChar:GetDescendants()) do
+                                if part:IsA("BasePart") then
+                                    firetouchinterest(part, coin, 0)
+                                    firetouchinterest(part, coin, 1)
                                 end
-                                
-                                firetouchinterest(lHRP, coin, 0)
-                                firetouchinterest(lHRP, coin, 1)
-                                
-                                local prompt = coin:FindFirstChildWhichIsA("ProximityPrompt")
-                                if prompt then
-                                    fireproximityprompt(prompt)
-                                end
-                                
-                                task.wait(0.05)
-                                
-                                if coin and coin.Parent then
-                                    coin.CFrame = oldCFrame
-                                end
-                            end)
-                        else
-                            pcall(function()
-                                local oldPos = lHRP.CFrame
-                                lHRP.CFrame = coin.CFrame * CFrame.new(0, 2, 0)
-                                task.wait(0.05)
-                                firetouchinterest(lHRP, coin, 0)
-                                firetouchinterest(lHRP, coin, 1)
-                                
-                                local prompt = coin:FindFirstChildWhichIsA("ProximityPrompt")
-                                if prompt then
-                                    fireproximityprompt(prompt)
-                                end
-                                
-                                task.wait(0.05)
-                                lHRP.CFrame = oldPos
-                            end)
-                        end
+                            end
+                            
+                            -- Proximity prompt if exists
+                            local prompt = coin:FindFirstChildWhichIsA("ProximityPrompt")
+                            if prompt then
+                                fireproximityprompt(prompt)
+                            end
+                            
+                            -- Instant return
+                            lHRP.CFrame = oldPos
+                        end)
                     end
+                    -- Minimal delay between coins
                     task.wait(Settings.AutoCoin_Delay)
                 end
             end
-            task.wait(0.1)
+            task.wait(0.05)
         end
     end)
 end
@@ -1499,9 +1534,9 @@ end
 MakeToggle(ESPContent, "ESP Master", "ESP_Enabled", "Show all players")
 
 -- Combat Tab
-MakeToggle(CombatContent, "Auto Kill", "AutoKill_Enabled", "Auto teleport + swing at hiders")
+MakeToggle(CombatContent, "Auto Kill", "AutoKill_Enabled", "Auto throw kill at hiders")
 MakeSlider(CombatContent, "Kill Radius", "AutoKill_Radius", 5, 50, " studs")
-MakeSlider(CombatContent, "Kill Delay", "AutoKill_Delay", 0.05, 1, "s")
+MakeSlider(CombatContent, "Kill Delay", "AutoKill_Delay", 0.01, 0.5, "s")
 MakeToggle(CombatContent, "Teleport Hider", "TeleportHider_Enabled", "Teleport to hiders")
 MakeSlider(CombatContent, "Teleport Delay", "TeleportHider_Delay", 0.5, 5, "s")
 MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Auto run from seekers")
@@ -1510,9 +1545,8 @@ MakeToggle(CombatContent, "Seeker Detector", "SeekerDetector", "Alert when seeke
 MakeSlider(CombatContent, "Detector Range", "DetectorRange", 50, 200, " studs")
 
 -- Misc Tab
-MakeToggle(MiscContent, "Auto Collect Coin", "AutoCoin_Enabled", "Auto collect coins")
-MakeToggle(MiscContent, "Coin Bypass", "CoinBypass", "Collect without teleport")
-MakeSlider(MiscContent, "Coin Delay", "AutoCoin_Delay", 0.01, 1, "s")
+MakeToggle(MiscContent, "Auto Collect Coin", "AutoCoin_Enabled", "Auto collect coins instantly")
+MakeSlider(MiscContent, "Coin Delay", "AutoCoin_Delay", 0.01, 0.5, "s")
 
 -- Player Tab
 MakeToggle(PlayerContent, "Speed Hack", "SpeedHack", "Fast run")
