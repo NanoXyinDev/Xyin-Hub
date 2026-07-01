@@ -1,11 +1,8 @@
 -- ============================================
--- XYINHUB v7.2 - PAINT OR SEEK EDITION
+-- XYINHUB v8.0 - PAINT OR SEEK EDITION
 -- @RukanooXD_YT
--- Game: Paint or Seek
--- Features: ESP, Auto Kill (Fixed), Auto Coin (Direct),
--- Auto Safe, Seeker Detector, Speed, Jump, Noclip
--- FIX: ESP no lobby, AutoKill no lobby, Fast Kill throw sim,
--- AutoCoin direct no bypass, No delay, Accurate
+-- Full Rebuild: Modern UI, Fixed Role Detection,
+-- Instant AutoKill, Instant AutoCoin, No Delays
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -16,63 +13,69 @@ local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
+local TextService = game:GetService("TextService")
 
 -- ============================================
 -- DEVICE DETECTION
 -- ============================================
 local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local UIScale = IsMobile and 0.85 or 1
+local UIScale = IsMobile and 0.78 or 1
 
 -- ============================================
--- SETTINGS
+-- SETTINGS - NO DELAYS, INSTANT
 -- ============================================
 local Settings = {
-    ESP_Enabled = false,
-    MaxDistance = 1000,
-    AutoKill_Enabled = false,
-    AutoKill_Radius = 30,
-    AutoKill_Delay = 0.05,
-    TeleportHider_Enabled = false,
-    TeleportHider_Delay = 1.5,
-    AutoCoin_Enabled = false,
-    AutoCoin_Delay = 0.01,
+    ESP = false,
+    MaxDistance = 1500,
+    AutoKill = false,
+    AutoKillRadius = 50,
+    TeleportHider = false,
+    AutoCoin = false,
     SpeedHack = false,
-    SpeedValue = 100,
+    SpeedValue = 120,
     JumpHack = false,
     JumpValue = 150,
     AutoSafe = false,
-    SafeDistance = 25,
+    SafeDistance = 30,
     SeekerDetector = false,
-    DetectorRange = 100,
+    DetectorRange = 150,
     Noclip = false,
+    Fly = false,
+    FlySpeed = 80,
 }
 
 -- ============================================
--- GAME STATE DETECTION — ENHANCED
+-- GAME STATE - ENHANCED DETECTION
 -- ============================================
 local GameState = {
     InRound = false,
     MyRole = "Unknown",
     RoundTimer = nil,
-    HidersLeft = 0,
 }
 
 local function UpdateGameState()
     local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
     local inRound = false
     
+    -- Check PlayerGui for round indicators
     if playerGui then
         for _, gui in ipairs(playerGui:GetDescendants()) do
             if gui:IsA("TextLabel") or gui:IsA("TextButton") then
                 local text = gui.Text:lower()
-                if text:match("round ends") or text:match("hiders left") or text:match("seekers left") or text:match("hiders:%s*%d+") or text:match("seekers:%s*%d+") then
+                -- Round active indicators
+                if text:match("round ends") or text:match("hiders left") or text:match("seekers left") 
+                   or text:match("hiders:%s*%d+") or text:match("seekers:%s*%d+")
+                   or text:match("time:") or text:match("timer:") then
                     inRound = true
-                    local timer = text:match("(%d+:%d+)")
-                    if timer then GameState.RoundTimer = timer end
                 end
-                if text:match("you:%s*seeker") or text:match("you%s*seeker") or text:match("role:%s*seeker") or text:match("team:%s*seeker") then
+                -- Role detection from UI
+                if text:match("you:%s*seeker") or text:match("you%s*seeker") 
+                   or text:match("role:%s*seeker") or text:match("team:%s*seeker")
+                   or text:match("you are a seeker") or text:match("you are seeker") then
                     GameState.MyRole = "Seeker"
-                elseif text:match("you:%s*hider") or text:match("you%s*hider") or text:match("role:%s*hider") or text:match("team:%s*hider") then
+                elseif text:match("you:%s*hider") or text:match("you%s*hider")
+                   or text:match("role:%s*hider") or text:match("team:%s*hider")
+                   or text:match("you are a hider") or text:match("you are hider") then
                     GameState.MyRole = "Hider"
                 end
             end
@@ -84,34 +87,177 @@ local function UpdateGameState()
         if obj:IsA("TextLabel") or obj:IsA("BillboardGui") then
             local txt = ""
             pcall(function() txt = obj.Text:lower() end)
-            if txt:match("hiders left") or txt:match("round ends") or txt:match("seekers left") then
+            if txt:match("hiders left") or txt:match("round ends") 
+               or txt:match("seekers left") or txt:match("time remaining") then
                 inRound = true
                 break
             end
         end
     end
     
-    -- Check if in lobby by looking for lobby-specific elements
-    local lobbyCheck = false
-    if Workspace:FindFirstChild("Lobby") or Workspace:FindFirstChild("Spawn") or Workspace:FindFirstChild("Intermission") then
-        -- Additional check: if no round indicators and lobby exists
-        if not inRound then
-            lobbyCheck = true
+    -- Check if in lobby (no round + lobby elements exist)
+    local isLobby = false
+    if not inRound then
+        if Workspace:FindFirstChild("Lobby") or Workspace:FindFirstChild("Intermission")
+           or Workspace:FindFirstChild("Waiting") or Workspace:FindFirstChild("Queue") then
+            isLobby = true
+        end
+        -- Check for spawn/lobby specific UI
+        if playerGui then
+            for _, gui in ipairs(playerGui:GetDescendants()) do
+                if gui:IsA("TextLabel") then
+                    local text = gui.Text:lower()
+                    if text:match("waiting for players") or text:match("intermission")
+                       or text:match("vote") or text:match("lobby") then
+                        isLobby = true
+                        break
+                    end
+                end
+            end
         end
     end
     
-    GameState.InRound = inRound and not lobbyCheck
+    GameState.InRound = inRound and not isLobby
 end
 
 task.spawn(function()
     while true do
         UpdateGameState()
-        task.wait(0.3)
+        task.wait(0.2)
     end
 end)
 
 -- ============================================
--- DRAWING MANAGER
+-- ENHANCED ROLE DETECTION SYSTEM
+-- ============================================
+local function GetPlayerRole(p)
+    if not p then return "Unknown" end
+    
+    -- Method 1: PlayerGui text (most reliable)
+    local playerGui = p:FindFirstChild("PlayerGui")
+    if playerGui then
+        for _, gui in ipairs(playerGui:GetDescendants()) do
+            if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+                local text = gui.Text:lower()
+                if text:match("you:%s*seeker") or text:match("you%s*seeker") 
+                   or text:match("role:%s*seeker") or text:match("team:%s*seeker")
+                   or text:match("you are a seeker") then
+                    return "Seeker"
+                end
+                if text:match("you:%s*hider") or text:match("you%s*hider")
+                   or text:match("role:%s*hider") or text:match("team:%s*hider")
+                   or text:match("you are a hider") then
+                    return "Hider"
+                end
+            end
+        end
+    end
+    
+    -- Method 2: Character attributes/values/tags
+    local c = p.Character
+    if c then
+        -- Check for role indicator objects
+        if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") 
+           or c:FindFirstChild("SeekerTag") or c:FindFirstChild("SeekerRole") then
+            return "Seeker"
+        end
+        if c:FindFirstChild("Hider") or c:FindFirstChild("IsHider")
+           or c:FindFirstChild("HiderTag") or c:FindFirstChild("HiderRole") then
+            return "Hider"
+        end
+        
+        -- Check for attributes
+        local attrs = {"Role", "Team", "GameRole", "PlayerRole"}
+        for _, attr in ipairs(attrs) do
+            local val = c:GetAttribute(attr)
+            if val then
+                local v = tostring(val):lower()
+                if v:match("seeker") then return "Seeker" end
+                if v:match("hider") then return "Hider" end
+            end
+        end
+        
+        -- Method 3: Tool-based detection (Seekers have weapons)
+        for _, tool in ipairs(c:GetChildren()) do
+            if tool:IsA("Tool") then
+                local tn = tool.Name:lower()
+                if tn:match("paint") or tn:match("brush") or tn:match("bucket") 
+                   or tn:match("seek") or tn:match("throw") or tn:match("knife")
+                   or tn:match("sword") or tn:match("weapon") or tn:match("gun")
+                   or tn:match("balloon") or tn:match("dart") then
+                    return "Seeker"
+                end
+            end
+        end
+        
+        -- Method 4: BillboardGui/NameTag tags
+        for _, g in ipairs(c:GetDescendants()) do
+            if g:IsA("BillboardGui") or g:IsA("TextLabel") then
+                local txt = ""
+                pcall(function() txt = g.Text:lower() end)
+                if txt:match("seeker") and not txt:match("hider") then return "Seeker" end
+                if txt:match("hider") and not txt:match("seeker") then return "Hider" end
+            end
+        end
+    end
+    
+    -- Method 5: Backpack tool check
+    local bp = p:FindFirstChild("Backpack")
+    if bp then
+        for _, tool in ipairs(bp:GetChildren()) do
+            if tool:IsA("Tool") then
+                local tn = tool.Name:lower()
+                if tn:match("paint") or tn:match("brush") or tn:match("bucket")
+                   or tn:match("seek") or tn:match("throw") or tn:match("knife")
+                   or tn:match("sword") or tn:match("weapon") or tn:match("gun") then
+                    return "Seeker"
+                end
+            end
+        end
+    end
+    
+    -- Method 6: Team-based inference
+    if p == LocalPlayer then
+        if GameState.MyRole ~= "Unknown" then
+            return GameState.MyRole
+        end
+    else
+        -- Infer from local player's role (opposite)
+        local myRole = GetPlayerRole(LocalPlayer)
+        if myRole == "Seeker" then return "Hider" end
+        if myRole == "Hider" then return "Seeker" end
+    end
+    
+    return "Unknown"
+end
+
+local function IsAlive(p)
+    local c = p.Character
+    if not c then return false end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    return h and h.Health > 0
+end
+
+local function GetHRP(p)
+    local c = p.Character
+    if not c then return nil end
+    return c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso")
+end
+
+local function IsHider(p)
+    return p ~= LocalPlayer and IsAlive(p) and GetPlayerRole(p) == "Hider"
+end
+
+local function IsSeeker(p)
+    return p ~= LocalPlayer and IsAlive(p) and GetPlayerRole(p) == "Seeker"
+end
+
+local function AmISeeker()
+    return GetPlayerRole(LocalPlayer) == "Seeker"
+end
+
+-- ============================================
+-- DRAWING MANAGER - ESP
 -- ============================================
 local ESPObjects = {}
 
@@ -131,117 +277,21 @@ end
 local function CreateESPObjects(p)
     RemoveESP(p)
     ESPObjects[p] = {
-        Line = CreateDrawing("Line", {Thickness = 1.5, Color = Color3.fromRGB(255,255,255), Transparency = 1, Visible = false, ZIndex = 1}),
-        Box = CreateDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(255,255,255), Transparency = 1, Filled = false, Visible = false, ZIndex = 2}),
-        BoxFill = CreateDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(255,255,255), Transparency = 0.08, Filled = true, Visible = false, ZIndex = 1}),
+        Line = CreateDrawing("Line", {Thickness = 1.5, Color = Color3.fromRGB(0,255,255), Transparency = 1, Visible = false, ZIndex = 1}),
+        Box = CreateDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(0,255,255), Transparency = 1, Filled = false, Visible = false, ZIndex = 2}),
+        BoxFill = CreateDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(0,255,255), Transparency = 0.06, Filled = true, Visible = false, ZIndex = 1}),
         Name = CreateDrawing("Text", {Text = "", Size = 13, Center = true, Outline = true, Color = Color3.fromRGB(255,255,255), Visible = false, ZIndex = 3}),
-        Dist = CreateDrawing("Text", {Text = "", Size = 13, Center = true, Outline = true, Color = Color3.fromRGB(180,180,180), Visible = false, ZIndex = 3}),
-        HP = CreateDrawing("Text", {Text = "", Size = 13, Center = true, Outline = true, Color = Color3.fromRGB(200,200,200), Visible = false, ZIndex = 3}),
-        RoleTag = CreateDrawing("Text", {Text = "", Size = 14, Center = true, Outline = true, Visible = false, ZIndex = 5}),
+        Dist = CreateDrawing("Text", {Text = "", Size = 12, Center = true, Outline = true, Color = Color3.fromRGB(180,180,180), Visible = false, ZIndex = 3}),
+        HP = CreateDrawing("Text", {Text = "", Size = 12, Center = true, Outline = true, Color = Color3.fromRGB(200,200,200), Visible = false, ZIndex = 3}),
+        RoleTag = CreateDrawing("Text", {Text = "", Size = 13, Center = true, Outline = true, Visible = false, ZIndex = 5}),
     }
 end
 
 -- ============================================
--- PLAYER CHECKS — ENHANCED
--- ============================================
-local function IsAlive(p)
-    local c = p.Character
-    if not c then return false end
-    local h = c:FindFirstChildOfClass("Humanoid")
-    return h and h.Health > 0
-end
-
-local function GetHRP(p)
-    local c = p.Character
-    if not c then return nil end
-    return c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso")
-end
-
-local function GetPlayerRole(p)
-    local playerGui = p:FindFirstChild("PlayerGui")
-    if playerGui then
-        for _, gui in ipairs(playerGui:GetDescendants()) do
-            if gui:IsA("TextLabel") or gui:IsA("TextButton") then
-                local text = gui.Text:lower()
-                if text:match("you:%s*seeker") or text:match("role:%s*seeker") or text:match("team:%s*seeker") or text:match("you%s*seeker") then
-                    return "Seeker"
-                end
-                if text:match("you:%s*hider") or text:match("role:%s*hider") or text:match("team:%s*hider") or text:match("you%s*hider") then
-                    return "Hider"
-                end
-            end
-        end
-    end
-    
-    local c = p.Character
-    if c then
-        if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") or c:FindFirstChild("SeekerTag") then return "Seeker" end
-        if c:FindFirstChild("Hider") or c:FindFirstChild("IsHider") or c:FindFirstChild("HiderTag") then return "Hider" end
-        
-        for _, tool in ipairs(c:GetChildren()) do
-            if tool:IsA("Tool") then
-                local tn = tool.Name:lower()
-                if tn:match("paint") or tn:match("brush") or tn:match("bucket") or tn:match("seek") or tn:match("throw") or tn:match("knife") then
-                    return "Seeker"
-                end
-            end
-        end
-        
-        local bp = p:FindFirstChild("Backpack")
-        if bp then
-            for _, tool in ipairs(bp:GetChildren()) do
-                if tool:IsA("Tool") then
-                    local tn = tool.Name:lower()
-                    if tn:match("paint") or tn:match("brush") or tn:match("bucket") or tn:match("seek") or tn:match("throw") or tn:match("knife") then
-                        return "Seeker"
-                    end
-                end
-            end
-        end
-        
-        for _, g in ipairs(c:GetDescendants()) do
-            if g:IsA("BillboardGui") or g:IsA("TextLabel") then
-                local txt = ""
-                pcall(function() txt = g.Text:lower() end)
-                if txt:match("seeker") then return "Seeker" end
-                if txt:match("hider") then return "Hider" end
-            end
-        end
-    end
-    
-    if p == LocalPlayer then
-        if GameState.MyRole ~= "Unknown" then
-            return GameState.MyRole
-        end
-    end
-    
-    if p ~= LocalPlayer then
-        local myRole = GetPlayerRole(LocalPlayer)
-        if myRole == "Seeker" then return "Hider" end
-        if myRole == "Hider" then return "Seeker" end
-    end
-    
-    return "Unknown"
-end
-
-local function IsHider(p)
-    return p ~= LocalPlayer and IsAlive(p) and GetPlayerRole(p) == "Hider"
-end
-
-local function IsSeeker(p)
-    return p ~= LocalPlayer and IsAlive(p) and GetPlayerRole(p) == "Seeker"
-end
-
-local function AmISeeker()
-    return GetPlayerRole(LocalPlayer) == "Seeker"
-end
-
--- ============================================
--- ESP UPDATE — FIXED: NO LOBBY
+-- ESP UPDATE - FIXED: NO LOBBY, REAL-TIME ROLE
 -- ============================================
 local function UpdateESP()
-    -- FORCE HIDE ALL if not in round
-    if not Settings.ESP_Enabled or not GameState.InRound then
+    if not Settings.ESP or not GameState.InRound then
         for _, o in pairs(ESPObjects) do
             for _, obj in pairs(o) do pcall(function() obj.Visible = false end) end
         end
@@ -287,13 +337,17 @@ local function UpdateESP()
         if not ESPObjects[p] then CreateESPObjects(p) end
         local o = ESPObjects[p]
         
+        -- REAL-TIME ROLE DETECTION (not cached)
         local role = GetPlayerRole(p)
         local hp = hum.Health
         local maxHp = hum.MaxHealth
         
-        local color = Color3.fromRGB(255,255,255)
-        if role == "Seeker" then color = Color3.fromRGB(255,80,80)
-        elseif role == "Hider" then color = Color3.fromRGB(80,255,80) end
+        local color = Color3.fromRGB(0,255,255) -- cyan default
+        if role == "Seeker" then 
+            color = Color3.fromRGB(255,50,50) -- red
+        elseif role == "Hider" then 
+            color = Color3.fromRGB(50,255,100) -- green
+        end
         
         local cf, size = c:GetBoundingBox()
         if not cf then continue end
@@ -356,11 +410,9 @@ local function UpdateESP()
 end
 
 -- ============================================
--- AUTO KILL — FIXED: THROW SIMULATION
--- Only works in round, strict distance, fast throw
+-- AUTO KILL - INSTANT THROW KILL, NO DELAY, BIG RADIUS
 -- ============================================
 local AutoKillConn = nil
-local LastKillTime = 0
 
 local function GetTool()
     local c = LocalPlayer.Character
@@ -375,7 +427,7 @@ local function GetTool()
                 local hum = c:FindFirstChildOfClass("Humanoid")
                 if hum then
                     hum:EquipTool(t)
-                    task.wait(0.05)
+                    task.wait(0.03)
                     return t
                 end
             end
@@ -387,7 +439,7 @@ end
 local function StartAutoKill()
     if AutoKillConn then return end
     AutoKillConn = RunService.Heartbeat:Connect(function()
-        if not Settings.AutoKill_Enabled then return end
+        if not Settings.AutoKill then return end
         if not GameState.InRound then return end
         if not AmISeeker() then return end
         
@@ -406,73 +458,60 @@ local function StartAutoKill()
             
             local c = p.Character
             local hrp = c and GetHRP(p)
-            local hum = c and c:FindFirstChildOfClass("Humanoid")
-            if not hrp or not hum then continue end
+            if not hrp then continue end
             
             local dist = (hrp.Position - lHRP.Position).Magnitude
-            if dist > Settings.AutoKill_Radius then continue end
+            if dist > Settings.AutoKillRadius then continue end
             
-            -- FAST THROW KILL: Teleport behind target, activate, return
-            -- This simulates the throw hitting the target
+            -- INSTANT THROW KILL
             pcall(function()
                 local oldCFrame = lHRP.CFrame
                 
-                -- Teleport to optimal throw position (behind target)
-                local targetPos = hrp.Position
-                local targetLook = hrp.CFrame.LookVector
-                local throwPos = targetPos - (targetLook * 3) + Vector3.new(0, 1, 0)
-                
-                lHRP.CFrame = CFrame.new(throwPos, targetPos)
+                -- Face target
+                lHRP.CFrame = CFrame.new(lHRP.Position, hrp.Position)
                 
                 -- Activate tool (throw)
                 tool:Activate()
                 
-                -- If tool has handle, move it through target body for touch
+                -- Move handle through target for guaranteed hit
                 if handle then
                     local oldHandleCF = handle.CFrame
-                    handle.CFrame = hrp.CFrame
-                    firetouchinterest(handle, hrp, 0)
-                    firetouchinterest(handle, hrp, 1)
                     
-                    -- Touch all target parts
-                    for _, part in ipairs(c:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            firetouchinterest(handle, part, 0)
-                            firetouchinterest(handle, part, 1)
-                        end
-                    end
-                    
-                    -- Touch with local parts too
-                    for _, part in ipairs(lChar:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            firetouchinterest(part, hrp, 0)
-                            firetouchinterest(part, hrp, 1)
+                    -- Teleport handle to target multiple times for hit registration
+                    for i = 1, 3 do
+                        handle.CFrame = hrp.CFrame * CFrame.new(math.random(-1,1), math.random(-1,1), math.random(-1,1))
+                        firetouchinterest(handle, hrp, 0)
+                        firetouchinterest(handle, hrp, 1)
+                        
+                        for _, part in ipairs(c:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                firetouchinterest(handle, part, 0)
+                                firetouchinterest(handle, part, 1)
+                            end
                         end
                     end
                     
                     handle.CFrame = oldHandleCF
-                else
-                    -- No handle, use body parts directly
-                    for _, part in ipairs(lChar:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            firetouchinterest(part, hrp, 0)
-                            firetouchinterest(part, hrp, 1)
-                        end
+                end
+                
+                -- Body touch fallback
+                for _, part in ipairs(lChar:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        firetouchinterest(part, hrp, 0)
+                        firetouchinterest(part, hrp, 1)
                     end
                 end
                 
-                -- Quick return to avoid detection
-                task.wait(0.02)
+                -- Return immediately
                 lHRP.CFrame = oldCFrame
             end)
-            
-            task.wait(Settings.AutoKill_Delay)
         end
+        -- NO DELAY - instant loop
     end)
 end
 
 -- ============================================
--- AUTO SAFE — ENHANCED
+-- AUTO SAFE
 -- ============================================
 local SafeConn = nil
 local LastSafeTeleport = 0
@@ -489,7 +528,7 @@ local function StartAutoSafe()
         local lHum = lChar and lChar:FindFirstChildOfClass("Humanoid")
         if not lHRP or not lHum then return end
         
-        if tick() - LastSafeTeleport < 0.3 then return end
+        if tick() - LastSafeTeleport < 0.2 then return end
         
         local nearestSeeker = nil
         local nearestDist = math.huge
@@ -499,21 +538,6 @@ local function StartAutoSafe()
             if not IsSeeker(p) then continue end
             
             local c = p.Character
-            local hasTool = false
-            if c then
-                for _, t in ipairs(c:GetChildren()) do
-                    if t:IsA("Tool") then hasTool = true break end
-                end
-            end
-            local bp = p:FindFirstChild("Backpack")
-            if bp and not hasTool then
-                for _, t in ipairs(bp:GetChildren()) do
-                    if t:IsA("Tool") then hasTool = true break end
-                end
-            end
-            
-            if not hasTool then continue end
-            
             local hrp = c and GetHRP(p)
             if hrp then
                 local d = (hrp.Position - lHRP.Position).Magnitude
@@ -526,7 +550,7 @@ local function StartAutoSafe()
         
         if nearestSeeker and nearestDist < Settings.SafeDistance then
             local awayDir = (lHRP.Position - nearestSeeker.Position).Unit
-            local safePos = lHRP.Position + awayDir * 25
+            local safePos = lHRP.Position + awayDir * 30
             safePos = Vector3.new(
                 math.clamp(safePos.X, -500, 500),
                 math.max(safePos.Y, 5),
@@ -538,25 +562,20 @@ local function StartAutoSafe()
             
             lHRP.CFrame = CFrame.new(safePos)
             lHRP.Velocity = Vector3.new(0, 0, 0)
-            
-            pcall(function()
-                lHum:MoveTo(safePos + awayDir * 5)
-            end)
-            
             LastSafeTeleport = tick()
         end
     end)
 end
 
 -- ============================================
--- SEEKER DETECTOR — ENHANCED
+-- SEEKER DETECTOR
 -- ============================================
 local DetectorText = CreateDrawing("Text", {
     Text = "",
     Size = 28,
     Center = true,
     Outline = true,
-    Color = Color3.fromRGB(255, 255, 255),
+    Color = Color3.fromRGB(255, 50, 50),
     Transparency = 1,
     Visible = false,
     ZIndex = 100
@@ -564,24 +583,17 @@ local DetectorText = CreateDrawing("Text", {
 
 local DetectorLine = CreateDrawing("Line", {
     Thickness = 3,
-    Color = Color3.fromRGB(255, 255, 255),
+    Color = Color3.fromRGB(255, 50, 50),
     Transparency = 1,
     Visible = false,
     ZIndex = 99
 })
 
-local LastDetectorReset = 0
-
-local function ResetDetector()
-    DetectorText.Visible = false
-    DetectorLine.Visible = false
-    LastDetectorReset = tick()
-end
-
 local function StartSeekerDetector()
     RunService.RenderStepped:Connect(function()
         if not GameState.InRound then
-            ResetDetector()
+            DetectorText.Visible = false
+            DetectorLine.Visible = false
             return
         end
         
@@ -624,15 +636,15 @@ local function StartSeekerDetector()
             local screenPos = Camera:WorldToViewportPoint(seekerPos)
             local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
             
-            local flash = math.abs(math.sin(tick() * 8))
-            DetectorText.Color = Color3.fromRGB(255, 255 * (1 - flash), 255 * (1 - flash))
+            local flash = math.abs(math.sin(tick() * 10))
+            DetectorText.Color = Color3.fromRGB(255, 50 + 205 * (1-flash), 50 + 205 * (1-flash))
             DetectorText.Text = "SEEKER " .. nearestSeeker.Name .. " " .. math.floor(nearestDist) .. "m"
             DetectorText.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y - 120)
             DetectorText.Visible = true
             
             DetectorLine.From = center
             DetectorLine.To = Vector2.new(screenPos.X, screenPos.Y)
-            DetectorLine.Color = Color3.fromRGB(255, 255 * (1 - flash), 255 * (1 - flash))
+            DetectorLine.Color = Color3.fromRGB(255, 50 + 205 * (1-flash), 50 + 205 * (1-flash))
             DetectorLine.Visible = true
         else
             DetectorText.Visible = false
@@ -671,7 +683,7 @@ local function StartSpeedHack()
     end
     
     LocalPlayer.CharacterAdded:Connect(function(newChar)
-        task.wait(0.5)
+        task.wait(0.3)
         local newHum = newChar:FindFirstChildOfClass("Humanoid")
         if newHum then
             if SpeedPropConn then SpeedPropConn:Disconnect() end
@@ -703,9 +715,7 @@ local function StartJumpHack()
                 h.UseJumpHeight = true
             end)
             pcall(function()
-                if h:FindFirstChild("JumpPower") then
-                    h.JumpPower = Settings.JumpValue
-                end
+                h.JumpPower = Settings.JumpValue
             end)
         end
     end)
@@ -745,190 +755,229 @@ local function StartNoclip()
 end
 
 -- ============================================
+-- FLY
+-- ============================================
+local FlyConn = nil
+local FlyBodyGyro = nil
+local FlyBodyVelo = nil
+
+local function StartFly()
+    if FlyConn then return end
+    
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        if FlyBodyGyro then FlyBodyGyro:Destroy() end
+        if FlyBodyVelo then FlyBodyVelo:Destroy() end
+        FlyBodyGyro = nil
+        FlyBodyVelo = nil
+    end)
+    
+    FlyConn = RunService.RenderStepped:Connect(function()
+        if not Settings.Fly then
+            if FlyBodyGyro then FlyBodyGyro:Destroy() FlyBodyGyro = nil end
+            if FlyBodyVelo then FlyBodyVelo:Destroy() FlyBodyVelo = nil end
+            return
+        end
+        
+        local c = LocalPlayer.Character
+        local hrp = c and GetHRP(LocalPlayer)
+        if not hrp then return end
+        
+        if not FlyBodyGyro then
+            FlyBodyGyro = Instance.new("BodyGyro")
+            FlyBodyGyro.P = 9e4
+            FlyBodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            FlyBodyGyro.CFrame = hrp.CFrame
+            FlyBodyGyro.Parent = hrp
+        end
+        
+        if not FlyBodyVelo then
+            FlyBodyVelo = Instance.new("BodyVelocity")
+            FlyBodyVelo.Velocity = Vector3.new(0, 0, 0)
+            FlyBodyVelo.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+            FlyBodyVelo.Parent = hrp
+        end
+        
+        local camCF = Camera.CFrame
+        local moveDir = Vector3.new(0, 0, 0)
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir = moveDir + camCF.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir = moveDir - camCF.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir = moveDir - camCF.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir = moveDir + camCF.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            moveDir = moveDir - Vector3.new(0, 1, 0)
+        end
+        
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit * Settings.FlySpeed
+        end
+        
+        FlyBodyGyro.CFrame = camCF
+        FlyBodyVelo.Velocity = moveDir
+    end)
+end
+
+-- ============================================
 -- TELEPORT HIDER
 -- ============================================
 local TPConn = nil
-local HiderList = {}
-local HiderIdx = 1
-
-local function UpdateHiders()
-    HiderList = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and IsHider(p) then
-            table.insert(HiderList, p)
-        end
-    end
-end
 
 local function StartTP()
     if TPConn then return end
     TPConn = task.spawn(function()
         while true do
-            if not Settings.TeleportHider_Enabled then
-                task.wait(1)
+            if not Settings.TeleportHider then
+                task.wait(0.5)
                 continue
             end
             if not AmISeeker() then
-                task.wait(1)
+                task.wait(0.5)
                 continue
             end
             
-            UpdateHiders()
-            if #HiderList > 0 then
-                HiderIdx = (HiderIdx % #HiderList) + 1
-                local target = HiderList[HiderIdx]
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p == LocalPlayer then continue end
+                if not IsHider(p) then continue end
                 
-                if target and target.Character and IsHider(target) then
-                    local tHRP = GetHRP(target)
-                    local lChar = LocalPlayer.Character
-                    local lHRP = lChar and GetHRP(LocalPlayer)
-                    
-                    if tHRP and lHRP then
-                        local ty = tHRP.Position.Y
-                        if ty > -100 and ty < 500 then
-                            lHRP.CFrame = tHRP.CFrame * CFrame.new(math.random(-2, 2), 0, 4)
-                        end
-                    end
+                local c = p.Character
+                local hrp = c and GetHRP(p)
+                local lChar = LocalPlayer.Character
+                local lHRP = lChar and GetHRP(LocalPlayer)
+                
+                if hrp and lHRP then
+                    lHRP.CFrame = hrp.CFrame * CFrame.new(0, 0, 3)
+                    break -- teleport to first hider found
                 end
             end
-            task.wait(Settings.TeleportHider_Delay)
+            task.wait(Settings.TeleportHider and 0.1 or 0.5)
         end
     end)
 end
 
 -- ============================================
--- AUTO COIN — FIXED: DIRECT NO BYPASS, NO DELAY, ACCURATE
+-- AUTO COIN - INSTANT, DIRECT, NO BYPASS, ACCURATE
 -- ============================================
 local CoinConn = nil
-local CoinBlacklist = {
-    "invite", "friend", "gui", "button", "frame", "label", "menu", "shop", "settings",
-    "inventory", "taunt", "pose", "lock", "paint", "troll", "become", "tiny", "giant",
-    "portal", "spawn", "lobby", "home", "base", "checkpoint", "chest", "crate", "box",
-    "camo", "sample", "fill", "brush", "bucket", "throw", "knife", "sword", "tool"
-}
 
-local CachedCoins = {}
-local LastCoinScan = 0
-
-local function IsRealCoin(obj)
+local function IsCoin(obj)
     if not obj or not obj.Parent then return false end
+    if not (obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Part")) then return false end
+    
     local n = obj.Name:lower()
-    for _, bl in ipairs(CoinBlacklist) do
+    local isCoinName = false
+    
+    -- Positive matches
+    if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash")
+       or n:match("gem") or n:match("token") or n:match("collectible") or n:match("point")
+       or n:match("star") or n:match("reward") or n:match("drop") or n:match("pickup")
+       or n:match("loot") or n:match("bonus") or n:match("candy") or n:match("xp")
+       or n:match("exp") or n:match("orb") or n:match("sphere") or n:match("bill") then
+        isCoinName = true
+    end
+    
+    if not isCoinName then return false end
+    
+    -- Negative matches (blacklist)
+    local blacklist = {"invite", "friend", "gui", "button", "frame", "label", "menu", "shop",
+        "settings", "inventory", "taunt", "pose", "lock", "paint", "troll", "become",
+        "tiny", "giant", "portal", "spawn", "lobby", "home", "base", "checkpoint",
+        "chest", "crate", "box", "camo", "sample", "fill", "brush", "bucket",
+        "throw", "knife", "sword", "tool", "weapon", "handle", "hitbox"}
+    
+    for _, bl in ipairs(blacklist) do
         if n:match(bl) then return false end
     end
-    if obj:FindFirstChild("Collected") then return false end
-    if obj:FindFirstChild("Disabled") then return false end
+    
+    -- Must have interaction capability
     local hasTouch = obj:FindFirstChildWhichIsA("TouchInterest") ~= nil
     local hasPrompt = obj:FindFirstChildWhichIsA("ProximityPrompt") ~= nil
-    return hasTouch or hasPrompt
+    local hasClick = obj:FindFirstChildWhichIsA("ClickDetector") ~= nil
+    
+    -- Also check parent for prompt
+    if not hasPrompt then
+        hasPrompt = obj.Parent and obj.Parent:FindFirstChildWhichIsA("ProximityPrompt") ~= nil
+    end
+    
+    return hasTouch or hasPrompt or hasClick
 end
 
-local function ScanCoins()
-    if tick() - LastCoinScan < 0.5 then return CachedCoins end
-    
-    CachedCoins = {}
+local function FindCoins()
+    local coins = {}
     local lChar = LocalPlayer.Character
     local lHRP = lChar and GetHRP(LocalPlayer)
-    if not lHRP then return CachedCoins end
+    if not lHRP then return coins end
     
-    local success, parts = pcall(function()
-        return Workspace:GetPartBoundsInRadius(lHRP.Position, 500)
-    end)
+    -- Method 1: Scan workspace descendants
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if IsCoin(obj) then
+            table.insert(coins, obj)
+        end
+    end
     
-    if success and parts then
-        for _, part in ipairs(parts) do
-            if part:IsA("BasePart") or part:IsA("MeshPart") then
-                local n = part.Name:lower()
-                if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or 
-                   n:match("gem") or n:match("token") or n:match("collect") or n:match("point") or
-                   n:match("star") or n:match("reward") or n:match("drop") or n:match("pickup") or
-                   n:match("loot") or n:match("bonus") or n:match("candy") or n:match("xp") or
-                   n:match("exp") or n:match("orb") or n:match("sphere") then
-                    if IsRealCoin(part) then
-                        table.insert(CachedCoins, part)
+    -- Method 2: Check common coin containers
+    local coinContainers = {"Coins", "CoinSpawns", "Drops", "Loot", "Collectibles", 
+        "Rewards", "Items", "Pickups", "Spawns", "Map", "Game"}
+    for _, name in ipairs(coinContainers) do
+        local container = Workspace:FindFirstChild(name)
+        if container then
+            for _, obj in ipairs(container:GetDescendants()) do
+                if IsCoin(obj) then
+                    local found = false
+                    for _, c in ipairs(coins) do
+                        if c == obj then found = true break end
+                    end
+                    if not found then
+                        table.insert(coins, obj)
                     end
                 end
             end
         end
     end
     
-    -- Also scan workspace children directly for named coins
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
-            local n = obj.Name:lower()
-            if (n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or
-                n:match("gem") or n:match("token") or n:match("collectible")) and IsRealCoin(obj) then
-                local found = false
-                for _, c in ipairs(CachedCoins) do
-                    if c == obj then found = true break end
-                end
-                if not found then
-                    table.insert(CachedCoins, obj)
-                end
-            end
-        end
-    end
-    
-    LastCoinScan = tick()
-    return CachedCoins
+    return coins
 end
-
-Workspace.DescendantAdded:Connect(function(obj)
-    if obj:IsA("BasePart") or obj:IsA("MeshPart") then
-        local n = obj.Name:lower()
-        if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash") or n:match("gem") then
-            if IsRealCoin(obj) then
-                table.insert(CachedCoins, obj)
-            end
-        end
-    end
-end)
-
-Workspace.DescendantRemoving:Connect(function(obj)
-    for i, coin in ipairs(CachedCoins) do
-        if coin == obj then
-            table.remove(CachedCoins, i)
-            break
-        end
-    end
-end)
 
 local function StartCoin()
     if CoinConn then return end
     CoinConn = task.spawn(function()
         while true do
-            if not Settings.AutoCoin_Enabled then
-                task.wait(0.5)
+            if not Settings.AutoCoin then
+                task.wait(0.3)
                 continue
             end
             
-            local coins = ScanCoins()
+            local coins = FindCoins()
             local lChar = LocalPlayer.Character
             local lHRP = lChar and GetHRP(LocalPlayer)
             
             if lHRP then
-                for i = #coins, 1, -1 do
-                    local coin = coins[i]
-                    if not Settings.AutoCoin_Enabled then break end
-                    if not coin or not coin.Parent then
-                        table.remove(coins, i)
-                        continue
-                    end
+                for _, coin in ipairs(coins) do
+                    if not Settings.AutoCoin then break end
+                    if not coin or not coin.Parent then continue end
                     
                     local dist = (coin.Position - lHRP.Position).Magnitude
-                    if dist < 300 then
-                        -- DIRECT COLLECT: Teleport to coin, touch, return — NO DELAY
+                    if dist < 400 then
                         pcall(function()
                             local oldPos = lHRP.CFrame
                             
-                            -- Direct teleport to coin
-                            lHRP.CFrame = coin.CFrame * CFrame.new(0, 1.5, 0)
+                            -- INSTANT teleport to coin
+                            lHRP.CFrame = coin.CFrame * CFrame.new(0, 2, 0)
                             
-                            -- Immediate touch
+                            -- Touch with all parts
                             firetouchinterest(lHRP, coin, 0)
                             firetouchinterest(lHRP, coin, 1)
                             
-                            -- Touch with all character parts
                             for _, part in ipairs(lChar:GetDescendants()) do
                                 if part:IsA("BasePart") then
                                     firetouchinterest(part, coin, 0)
@@ -936,18 +985,25 @@ local function StartCoin()
                                 end
                             end
                             
-                            -- Proximity prompt if exists
+                            -- Prompt
                             local prompt = coin:FindFirstChildWhichIsA("ProximityPrompt")
+                            if not prompt and coin.Parent then
+                                prompt = coin.Parent:FindFirstChildWhichIsA("ProximityPrompt")
+                            end
                             if prompt then
                                 fireproximityprompt(prompt)
                             end
                             
-                            -- Instant return
+                            -- Click detector
+                            local clicker = coin:FindFirstChildWhichIsA("ClickDetector")
+                            if clicker then
+                                fireclickdetector(clicker)
+                            end
+                            
+                            -- INSTANT return
                             lHRP.CFrame = oldPos
                         end)
                     end
-                    -- Minimal delay between coins
-                    task.wait(Settings.AutoCoin_Delay)
                 end
             end
             task.wait(0.05)
@@ -960,7 +1016,7 @@ end
 -- ============================================
 Players.PlayerAdded:Connect(function(p)
     p.CharacterAdded:Connect(function()
-        task.wait(1)
+        task.wait(0.5)
         CreateESPObjects(p)
     end)
 end)
@@ -974,7 +1030,7 @@ for _, p in ipairs(Players:GetPlayers()) do
 end
 
 -- ============================================
--- INITIALIZE ALL SYSTEMS
+-- INITIALIZE SYSTEMS
 -- ============================================
 RunService.RenderStepped:Connect(UpdateESP)
 StartAutoKill()
@@ -983,67 +1039,55 @@ StartSeekerDetector()
 StartSpeedHack()
 StartJumpHack()
 StartNoclip()
+StartFly()
 StartTP()
 StartCoin()
 
 -- ============================================
--- UI - CINEMATIC B&W PROFESSIONAL
+-- MODERN UI - FLUXUS/ARCEUS X STYLE
 -- ============================================
 local SG = Instance.new("ScreenGui")
-SG.Name = "XyinESP_" .. tostring(math.random(10000, 99999))
+SG.Name = "XyinHub_" .. tostring(math.random(10000, 99999))
 SG.Parent = CoreGui
 SG.ResetOnSpawn = false
 SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 -- Watermark
 local Watermark = Instance.new("TextLabel")
-Watermark.Size = UDim2.new(0, 200, 0, 20)
-Watermark.Position = UDim2.new(1, -210, 0, 10)
+Watermark.Size = UDim2.new(0, 250, 0, 20)
+Watermark.Position = UDim2.new(1, -260, 0, 10)
 Watermark.BackgroundTransparency = 1
-Watermark.Text = "@RukanooXD_YT"
-Watermark.TextColor3 = Color3.fromRGB(255, 255, 255)
-Watermark.TextSize = 12
+Watermark.Text = "@RukanooXD_YT | XYINHUB v8.0"
+Watermark.TextColor3 = Color3.fromRGB(0, 255, 255)
+Watermark.TextSize = 11
 Watermark.Font = Enum.Font.GothamBold
-Watermark.TextTransparency = 0.3
+Watermark.TextTransparency = 0.4
 Watermark.Parent = SG
 
--- ============================================
--- LOADING SCREEN - CINEMATIC GLITCH
--- ============================================
+-- Loading Screen
 local Loading = Instance.new("Frame")
 Loading.Size = UDim2.new(1, 0, 1, 0)
-Loading.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Loading.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
 Loading.BorderSizePixel = 0
 Loading.ZIndex = 9999
 Loading.Parent = SG
 
-for i = 0, 1, 0.02 do
-    local line = Instance.new("Frame")
-    line.Size = UDim2.new(1, 0, 0, 1)
-    line.Position = UDim2.new(0, 0, i, 0)
-    line.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    line.BackgroundTransparency = 0.7
-    line.BorderSizePixel = 0
-    line.ZIndex = 9998
-    line.Parent = Loading
-end
-
-local Gradient = Instance.new("UIGradient")
-Gradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-    ColorSequenceKeypoint.new(0.3, Color3.fromRGB(15, 15, 15)),
-    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(10, 10, 10)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+local LoadGradient = Instance.new("UIGradient")
+LoadGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(8, 8, 16)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(12, 12, 24)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 8, 16))
 })
-Gradient.Rotation = 90
-Gradient.Parent = Loading
+LoadGradient.Rotation = 45
+LoadGradient.Parent = Loading
 
-for i = 1, 30 do
+-- Animated particles
+for i = 1, 20 do
     local p = Instance.new("Frame")
-    p.Size = UDim2.new(0, math.random(2, 5), 0, math.random(2, 5))
+    p.Size = UDim2.new(0, math.random(3, 6), 0, math.random(3, 6))
     p.Position = UDim2.new(math.random(), 0, math.random(), 0)
-    p.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    p.BackgroundTransparency = math.random(5, 9) / 10
+    p.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+    p.BackgroundTransparency = math.random(6, 9) / 10
     p.BorderSizePixel = 0
     p.ZIndex = 10000
     p.Parent = Loading
@@ -1051,82 +1095,61 @@ for i = 1, 30 do
     
     task.spawn(function()
         while p.Parent do
-            TweenService:Create(p, TweenInfo.new(math.random(3, 7)), {
+            TweenService:Create(p, TweenInfo.new(math.random(2, 5)), {
                 Position = UDim2.new(math.random(), 0, math.random(), 0),
-                BackgroundTransparency = math.random(5, 9) / 10
+                BackgroundTransparency = math.random(6, 9) / 10
             }):Play()
-            task.wait(math.random(3, 7))
+            task.wait(math.random(2, 5))
         end
     end)
 end
 
-local GlitchTexts = {"XYINHUB", "X_Y_I_N_H_U_B", "X#Y#I#N#H#U#B", "XY1NHUB", "X¥INHUB"}
-local Logo = Instance.new("TextLabel")
-Logo.Size = UDim2.new(0, 600, 0, 80 * UIScale)
-Logo.Position = UDim2.new(0.5, -300, 0.28, 0)
-Logo.BackgroundTransparency = 1
-Logo.Text = ""
-Logo.TextColor3 = Color3.fromRGB(255, 255, 255)
-Logo.TextSize = 56 * UIScale
-Logo.Font = Enum.Font.GothamBlack
-Logo.ZIndex = 10001
-Logo.Parent = Loading
+local LogoText = Instance.new("TextLabel")
+LogoText.Size = UDim2.new(0, 500, 0, 70 * UIScale)
+LogoText.Position = UDim2.new(0.5, -250, 0.3, 0)
+LogoText.BackgroundTransparency = 1
+LogoText.Text = "XYINHUB"
+LogoText.TextColor3 = Color3.fromRGB(0, 255, 255)
+LogoText.TextSize = 52 * UIScale
+LogoText.Font = Enum.Font.GothamBlack
+LogoText.ZIndex = 10001
+LogoText.Parent = Loading
 
+local SubText = Instance.new("TextLabel")
+SubText.Size = UDim2.new(0, 500, 0, 24 * UIScale)
+SubText.Position = UDim2.new(0.5, -250, 0.38, 0)
+SubText.BackgroundTransparency = 1
+SubText.Text = "Paint or Seek Edition | v8.0"
+SubText.TextColor3 = Color3.fromRGB(100, 200, 255)
+SubText.TextSize = 14 * UIScale
+SubText.Font = Enum.Font.GothamBold
+SubText.ZIndex = 10001
+SubText.Parent = Loading
+
+local RoleText = Instance.new("TextLabel")
+RoleText.Size = UDim2.new(0, 300, 0, 20 * UIScale)
+RoleText.Position = UDim2.new(0.5, -150, 0.43, 0)
+RoleText.BackgroundTransparency = 1
+RoleText.Text = "Detecting Role..."
+RoleText.TextColor3 = Color3.fromRGB(150, 150, 150)
+RoleText.TextSize = 11 * UIScale
+RoleText.Font = Enum.Font.Gotham
+RoleText.ZIndex = 10001
+RoleText.Parent = Loading
+
+-- Update role text
 task.spawn(function()
-    local finalText = "XYINHUB"
-    for i = 1, #finalText do
-        local char = string.sub(finalText, 1, i)
-        Logo.Text = char
-        task.wait(0.1)
+    while Loading.Parent do
+        local role = GetPlayerRole(LocalPlayer)
+        RoleText.Text = "You: " .. role .. " | " .. (GameState.InRound and "In Round" or "In Lobby")
+        task.wait(0.5)
     end
-    
-    for i = 1, 8 do
-        Logo.Text = GlitchTexts[math.random(1, #GlitchTexts)]
-        Logo.TextColor3 = Color3.fromRGB(math.random(200, 255), math.random(200, 255), math.random(200, 255))
-        task.wait(0.05)
-    end
-    Logo.Text = finalText
-    Logo.TextColor3 = Color3.fromRGB(255, 255, 255)
 end)
 
-local Glow = Instance.new("TextLabel")
-Glow.Size = Logo.Size
-Glow.Position = UDim2.new(0.5, -298, 0.28, 2)
-Glow.BackgroundTransparency = 1
-Glow.Text = "XYINHUB"
-Glow.TextColor3 = Color3.fromRGB(255, 255, 255)
-Glow.TextSize = 56 * UIScale
-Glow.Font = Enum.Font.GothamBlack
-Glow.TextTransparency = 0.85
-Glow.ZIndex = 10000
-Glow.Parent = Loading
-
-local Sub = Instance.new("TextLabel")
-Sub.Size = UDim2.new(0, 600, 0, 25 * UIScale)
-Sub.Position = UDim2.new(0.5, -300, 0.37, 0)
-Sub.BackgroundTransparency = 1
-Sub.Text = "Paint or Seek Edition | v7.1 | Premium Script"
-Sub.TextColor3 = Color3.fromRGB(120, 120, 120)
-Sub.TextSize = 13 * UIScale
-Sub.Font = Enum.Font.Gotham
-Sub.ZIndex = 10001
-Sub.Parent = Loading
-
-local Auth = Instance.new("TextLabel")
-Auth.Size = UDim2.new(0, 300, 0, 20 * UIScale)
-Auth.Position = UDim2.new(0.5, -150, 0.41, 0)
-Auth.BackgroundTransparency = 1
-Auth.Text = "by @RukanooXD_YT"
-Auth.TextColor3 = Color3.fromRGB(180, 180, 180)
-Auth.TextSize = 11 * UIScale
-Auth.Font = Enum.Font.GothamBold
-Auth.ZIndex = 10001
-Auth.Parent = Loading
-
 local BarBG = Instance.new("Frame")
-BarBG.Size = UDim2.new(0, 320 * UIScale, 0, 4)
-BarBG.Position = UDim2.new(0.5, -160 * UIScale, 0.5, 0)
-BarBG.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+BarBG.Size = UDim2.new(0, 300 * UIScale, 0, 4)
+BarBG.Position = UDim2.new(0.5, -150 * UIScale, 0.5, 0)
+BarBG.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 BarBG.BorderSizePixel = 0
 BarBG.ZIndex = 10001
 BarBG.Parent = Loading
@@ -1134,170 +1157,211 @@ Instance.new("UICorner", BarBG).CornerRadius = UDim.new(0, 2)
 
 local BarFill = Instance.new("Frame")
 BarFill.Size = UDim2.new(0, 0, 1, 0)
-BarFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+BarFill.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
 BarFill.BorderSizePixel = 0
 BarFill.ZIndex = 10002
 BarFill.Parent = BarBG
 Instance.new("UICorner", BarFill).CornerRadius = UDim.new(0, 2)
 
-local Pct = Instance.new("TextLabel")
-Pct.Size = UDim2.new(0, 100, 0, 22 * UIScale)
-Pct.Position = UDim2.new(0.5, -50, 0.52, 5)
-Pct.BackgroundTransparency = 1
-Pct.Text = "0%"
-Pct.TextColor3 = Color3.fromRGB(255, 255, 255)
-Pct.TextSize = 14 * UIScale
-Pct.Font = Enum.Font.GothamBlack
-Pct.ZIndex = 10001
-Pct.Parent = Loading
-
-local Status = Instance.new("TextLabel")
-Status.Size = UDim2.new(0, 400, 0, 18 * UIScale)
-Status.Position = UDim2.new(0.5, -200, 0.57, 0)
-Status.BackgroundTransparency = 1
-Status.Text = "Initializing..."
-Status.TextColor3 = Color3.fromRGB(80, 80, 80)
-Status.TextSize = 10 * UIScale
-Status.Font = Enum.Font.Gotham
-Status.ZIndex = 10001
-Status.Parent = Loading
+local PctText = Instance.new("TextLabel")
+PctText.Size = UDim2.new(0, 100, 0, 20 * UIScale)
+PctText.Position = UDim2.new(0.5, -50, 0.52, 5)
+PctText.BackgroundTransparency = 1
+PctText.Text = "0%"
+PctText.TextColor3 = Color3.fromRGB(0, 255, 255)
+PctText.TextSize = 13 * UIScale
+PctText.Font = Enum.Font.GothamBlack
+PctText.ZIndex = 10001
+PctText.Parent = Loading
 
 task.spawn(function()
     local stages = {
-        {pct = 10, txt = "Initializing Core..."},
-        {pct = 22, txt = "Loading ESP Engine..."},
-        {pct = 35, txt = "Loading Combat Systems..."},
-        {pct = 48, txt = "Loading Speed & Jump..."},
-        {pct = 58, txt = "Loading Auto Safe..."},
-        {pct = 68, txt = "Loading Seeker Detector..."},
-        {pct = 78, txt = "Loading Coin Collector..."},
-        {pct = 88, txt = "Building Cinematic UI..."},
-        {pct = 95, txt = "Finalizing..."},
+        {pct = 12, txt = "Loading Core..."},
+        {pct = 25, txt = "Initializing ESP..."},
+        {pct = 38, txt = "Loading Combat..."},
+        {pct = 50, txt = "Loading Movement..."},
+        {pct = 62, txt = "Loading Utilities..."},
+        {pct = 75, txt = "Building UI..."},
+        {pct = 88, txt = "Finalizing..."},
         {pct = 100, txt = "Ready!"},
     }
     
     local cur = 0
     for _, s in ipairs(stages) do
         while cur < s.pct do
-            cur = cur + math.random(1, 3)
+            cur = cur + math.random(1, 4)
             if cur > s.pct then cur = s.pct end
             BarFill.Size = UDim2.new(cur / 100, 0, 1, 0)
-            Pct.Text = cur .. "%"
-            Status.Text = s.txt
-            task.wait(0.04)
+            PctText.Text = cur .. "%"
+            task.wait(0.03)
         end
-        task.wait(0.15)
+        task.wait(0.1)
     end
     
-    task.wait(0.6)
+    task.wait(0.5)
     
     for _, child in ipairs(Loading:GetDescendants()) do
         if child:IsA("TextLabel") then
-            TweenService:Create(child, TweenInfo.new(0.6), {TextTransparency = 1}):Play()
+            TweenService:Create(child, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
         elseif child:IsA("Frame") and child ~= Loading then
-            TweenService:Create(child, TweenInfo.new(0.6), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
         end
     end
     
-    TweenService:Create(Loading, TweenInfo.new(1), {BackgroundTransparency = 1}):Play()
-    task.wait(1.2)
+    TweenService:Create(Loading, TweenInfo.new(0.8), {BackgroundTransparency = 1}):Play()
+    task.wait(1)
     Loading:Destroy()
 end)
 
 -- ============================================
--- MAIN MENU - PROFESSIONAL B&W
+-- MAIN MENU - MODERN DARK GLASS
 -- ============================================
-local MenuSize = IsMobile and UDim2.new(0, 300, 0, 400) or UDim2.new(0, 400, 0, 540)
+local MenuSize = IsMobile and UDim2.new(0, 320, 0, 420) or UDim2.new(0, 420, 0, 560)
 local Main = Instance.new("Frame")
 Main.Name = "MainMenu"
 Main.Size = MenuSize
 Main.Position = UDim2.new(0.5, -MenuSize.X.Offset / 2, 0.5, -MenuSize.Y.Offset / 2)
-Main.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
-Main.BackgroundTransparency = 0.02
+Main.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+Main.BackgroundTransparency = 0.05
 Main.BorderSizePixel = 0
 Main.Visible = false
 Main.Active = true
 Main.ClipsDescendants = true
 Main.Parent = SG
 
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 18)
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 16)
 
-local Glass = Instance.new("UIGradient")
-Glass.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(8, 8, 8)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 8, 8))
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(0, 200, 255)
+MainStroke.Thickness = 1.5
+MainStroke.Transparency = 0.3
+MainStroke.Parent = Main
+
+local MainGradient = Instance.new("UIGradient")
+MainGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 15, 25)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 20, 35)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 25))
 })
-Glass.Rotation = 135
-Glass.Parent = Main
+MainGradient.Rotation = 135
+MainGradient.Parent = Main
 
+-- Shadow
 local Shadow = Instance.new("ImageLabel")
-Shadow.Size = UDim2.new(1, 60, 1, 60)
-Shadow.Position = UDim2.new(0, -30, 0, -30)
+Shadow.Size = UDim2.new(1, 80, 1, 80)
+Shadow.Position = UDim2.new(0, -40, 0, -40)
 Shadow.BackgroundTransparency = 1
 Shadow.Image = "rbxassetid://5554236805"
 Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-Shadow.ImageTransparency = 0.35
+Shadow.ImageTransparency = 0.4
 Shadow.ScaleType = Enum.ScaleType.Slice
 Shadow.SliceCenter = Rect.new(23, 23, 277, 277)
 Shadow.ZIndex = -1
 Shadow.Parent = Main
 
-local Title = Instance.new("Frame")
-Title.Size = UDim2.new(1, 0, 0, 54 * UIScale)
-Title.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-Title.BorderSizePixel = 0
-Title.Parent = Main
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 18)
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 56 * UIScale)
+TitleBar.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = Main
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 16)
+
+local TitleAccent = Instance.new("Frame")
+TitleAccent.Size = UDim2.new(1, 0, 0, 2)
+TitleAccent.Position = UDim2.new(0, 0, 1, -2)
+TitleAccent.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+TitleAccent.BorderSizePixel = 0
+TitleAccent.Parent = TitleBar
+
+local TitleIcon = Instance.new("TextLabel")
+TitleIcon.Size = UDim2.new(0, 30, 0, 30)
+TitleIcon.Position = UDim2.new(0, 14, 0, 13)
+TitleIcon.BackgroundTransparency = 1
+TitleIcon.Text = "◈"
+TitleIcon.TextColor3 = Color3.fromRGB(0, 255, 255)
+TitleIcon.TextSize = 22
+TitleIcon.Font = Enum.Font.GothamBlack
+TitleIcon.Parent = TitleBar
 
 local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -120, 0, 28 * UIScale)
-TitleText.Position = UDim2.new(0, 18, 0, 6)
+TitleText.Size = UDim2.new(0, 200, 0, 26 * UIScale)
+TitleText.Position = UDim2.new(0, 48, 0, 6)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "XYINHUB v7.1"
+TitleText.Text = "XYINHUB"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.TextSize = 18 * UIScale
 TitleText.Font = Enum.Font.GothamBlack
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
-TitleText.Parent = Title
+TitleText.Parent = TitleBar
 
 local TitleSub = Instance.new("TextLabel")
-TitleSub.Size = UDim2.new(1, -120, 0, 16 * UIScale)
-TitleSub.Position = UDim2.new(0, 18, 0, 32)
+TitleSub.Size = UDim2.new(0, 200, 0, 16 * UIScale)
+TitleSub.Position = UDim2.new(0, 48, 0, 30)
 TitleSub.BackgroundTransparency = 1
-TitleSub.Text = "Paint or Seek | Premium"
-TitleSub.TextColor3 = Color3.fromRGB(80, 80, 80)
+TitleSub.Text = "Paint or Seek | v8.0"
+TitleSub.TextColor3 = Color3.fromRGB(100, 150, 200)
 TitleSub.TextSize = 9 * UIScale
-TitleSub.Font = Enum.Font.Gotham
+TitleSub.Font = Enum.Font.GothamBold
 TitleSub.TextXAlignment = Enum.TextXAlignment.Left
-TitleSub.Parent = Title
+TitleSub.Parent = TitleBar
 
+-- Role Display
+local RoleDisplay = Instance.new("TextLabel")
+RoleDisplay.Size = UDim2.new(0, 120, 0, 20 * UIScale)
+RoleDisplay.Position = UDim2.new(1, -130, 0, 8)
+RoleDisplay.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+RoleDisplay.Text = "You: Unknown"
+RoleDisplay.TextColor3 = Color3.fromRGB(0, 255, 255)
+RoleDisplay.TextSize = 10 * UIScale
+RoleDisplay.Font = Enum.Font.GothamBold
+RoleDisplay.Parent = TitleBar
+Instance.new("UICorner", RoleDisplay).CornerRadius = UDim.new(0, 6)
+
+-- Update role display
+task.spawn(function()
+    while RoleDisplay.Parent do
+        local role = GetPlayerRole(LocalPlayer)
+        RoleDisplay.Text = "You: " .. role
+        if role == "Seeker" then
+            RoleDisplay.TextColor3 = Color3.fromRGB(255, 80, 80)
+        elseif role == "Hider" then
+            RoleDisplay.TextColor3 = Color3.fromRGB(80, 255, 100)
+        else
+            RoleDisplay.TextColor3 = Color3.fromRGB(0, 255, 255)
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Minimize & Close
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 32, 0, 32)
-MinBtn.Position = UDim2.new(1, -74, 0, 11)
-MinBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MinBtn.Text = "-"
+MinBtn.Size = UDim2.new(0, 28, 0, 28)
+MinBtn.Position = UDim2.new(1, -66, 0, 14)
+MinBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+MinBtn.Text = "−"
 MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinBtn.TextSize = 20
+MinBtn.TextSize = 18
 MinBtn.Font = Enum.Font.GothamBold
-MinBtn.Parent = Title
-Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
+MinBtn.Parent = TitleBar
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 6)
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 32, 0, 32)
-CloseBtn.Position = UDim2.new(1, -38, 0, 11)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-CloseBtn.Text = "X"
+CloseBtn.Size = UDim2.new(0, 28, 0, 28)
+CloseBtn.Position = UDim2.new(1, -34, 0, 14)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseBtn.Text = "×"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.TextSize = 14
+CloseBtn.TextSize = 18
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Parent = Title
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
+-- Tab Frame
 local TabFrame = Instance.new("Frame")
-TabFrame.Size = UDim2.new(1, -16, 0, 38 * UIScale)
-TabFrame.Position = UDim2.new(0, 8, 0, 56)
-TabFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+TabFrame.Size = UDim2.new(1, -20, 0, 36 * UIScale)
+TabFrame.Position = UDim2.new(0, 10, 0, 58)
+TabFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
 TabFrame.BorderSizePixel = 0
 TabFrame.Parent = Main
 Instance.new("UICorner", TabFrame).CornerRadius = UDim.new(0, 10)
@@ -1314,10 +1378,10 @@ local Contents = {}
 
 local function MakeTab(name, icon)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 88 * UIScale, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    btn.Size = UDim2.new(0, 95 * UIScale, 0, 28)
+    btn.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
     btn.Text = icon .. " " .. name
-    btn.TextColor3 = Color3.fromRGB(100, 100, 100)
+    btn.TextColor3 = Color3.fromRGB(120, 120, 150)
     btn.TextSize = 10 * UIScale
     btn.Font = Enum.Font.GothamBold
     btn.Parent = TabFrame
@@ -1325,13 +1389,13 @@ local function MakeTab(name, icon)
     
     local content = Instance.new("ScrollingFrame")
     content.Name = name
-    content.Size = UDim2.new(1, -16, 1, -110 * UIScale)
-    content.Position = UDim2.new(0, 8, 0, 98 * UIScale)
+    content.Size = UDim2.new(1, -20, 1, -108 * UIScale)
+    content.Position = UDim2.new(0, 10, 0, 98 * UIScale)
     content.BackgroundTransparency = 1
     content.BorderSizePixel = 0
     content.ScrollBarThickness = 3
-    content.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
-    content.CanvasSize = UDim2.new(0, 0, 0, 1000)
+    content.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
+    content.CanvasSize = UDim2.new(0, 0, 0, 1200)
     content.Visible = false
     content.Parent = Main
     
@@ -1342,11 +1406,11 @@ local function MakeTab(name, icon)
     
     btn.MouseButton1Click:Connect(function()
         for _, b in ipairs(Tabs) do
-            b.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-            b.TextColor3 = Color3.fromRGB(100, 100, 100)
+            b.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+            b.TextColor3 = Color3.fromRGB(120, 120, 150)
         end
         for _, c in pairs(Contents) do c.Visible = false end
-        btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
         btn.TextColor3 = Color3.fromRGB(0, 0, 0)
         content.Visible = true
     end)
@@ -1354,59 +1418,63 @@ local function MakeTab(name, icon)
     return content
 end
 
-local ESPContent = MakeTab("ESP", "👁️")
-local CombatContent = MakeTab("Combat", "⚔️")
-local MiscContent = MakeTab("Misc", "🛠️")
-local PlayerContent = MakeTab("Player", "🏃")
+local ESPContent = MakeTab("ESP", "◉")
+local CombatContent = MakeTab("Combat", "⚔")
+local MiscContent = MakeTab("Misc", "◆")
+local PlayerContent = MakeTab("Player", "▲")
 
-Tabs[1].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Tabs[1].BackgroundColor3 = Color3.fromRGB(0, 200, 255)
 Tabs[1].TextColor3 = Color3.fromRGB(0, 0, 0)
 ESPContent.Visible = true
 
+-- ============================================
+-- UI COMPONENTS
+-- ============================================
 local function MakeToggle(parent, text, key, desc)
     local f = Instance.new("Frame")
-    f.Size = UDim2.new(1, 0, 0, 58 * UIScale)
-    f.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+    f.Size = UDim2.new(1, 0, 0, 56 * UIScale)
+    f.BackgroundColor3 = Color3.fromRGB(18, 18, 30)
     f.BorderSizePixel = 0
     f.Parent = parent
     Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
     
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0.6, -10, 0, 24 * UIScale)
+    lbl.Size = UDim2.new(0.55, -10, 0, 22 * UIScale)
     lbl.Position = UDim2.new(0, 14, 0, 6)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-    lbl.TextSize = 13 * UIScale
+    lbl.TextColor3 = Color3.fromRGB(230, 230, 255)
+    lbl.TextSize = 12 * UIScale
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = f
     
     if desc then
         local d = Instance.new("TextLabel")
-        d.Size = UDim2.new(0.6, -10, 0, 16 * UIScale)
-        d.Position = UDim2.new(0, 14, 0, 30)
+        d.Size = UDim2.new(0.55, -10, 0, 16 * UIScale)
+        d.Position = UDim2.new(0, 14, 0, 28)
         d.BackgroundTransparency = 1
         d.Text = desc
-        d.TextColor3 = Color3.fromRGB(70, 70, 70)
+        d.TextColor3 = Color3.fromRGB(80, 80, 100)
         d.TextSize = 9 * UIScale
         d.Font = Enum.Font.Gotham
         d.TextXAlignment = Enum.TextXAlignment.Left
         d.Parent = f
     end
     
+    -- Modern toggle
     local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(0, 50, 0, 26)
-    bg.Position = UDim2.new(1, -62, 0.5, -13)
-    bg.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    bg.Size = UDim2.new(0, 48, 0, 24)
+    bg.Position = UDim2.new(1, -60, 0.5, -12)
+    bg.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
     bg.BorderSizePixel = 0
     bg.Parent = f
     Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
     
     local circle = Instance.new("Frame")
-    circle.Size = UDim2.new(0, 22, 0, 22)
-    circle.Position = UDim2.new(0, 2, 0.5, -11)
-    circle.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    circle.Size = UDim2.new(0, 20, 0, 20)
+    circle.Position = UDim2.new(0, 2, 0.5, -10)
+    circle.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
     circle.BorderSizePixel = 0
     circle.Parent = bg
     Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
@@ -1419,16 +1487,16 @@ local function MakeToggle(parent, text, key, desc)
     
     local function Update()
         if Settings[key] then
-            TweenService:Create(bg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            TweenService:Create(bg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 200, 255)}):Play()
             TweenService:Create(circle, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
-                Position = UDim2.new(0, 26, 0.5, -11),
-                BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                Position = UDim2.new(0, 26, 0.5, -10),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             }):Play()
         else
-            TweenService:Create(bg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
+            TweenService:Create(bg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 30, 45)}):Play()
             TweenService:Create(circle, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
-                Position = UDim2.new(0, 2, 0.5, -11),
-                BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+                Position = UDim2.new(0, 2, 0.5, -10),
+                BackgroundColor3 = Color3.fromRGB(80, 80, 100)
             }):Play()
         end
     end
@@ -1444,60 +1512,60 @@ end
 
 local function MakeSlider(parent, text, key, min, max, suffix)
     local f = Instance.new("Frame")
-    f.Size = UDim2.new(1, 0, 0, 62 * UIScale)
-    f.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+    f.Size = UDim2.new(1, 0, 0, 58 * UIScale)
+    f.BackgroundColor3 = Color3.fromRGB(18, 18, 30)
     f.BorderSizePixel = 0
     f.Parent = parent
     Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
     
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0.7, -10, 0, 22 * UIScale)
+    lbl.Size = UDim2.new(0.65, -10, 0, 20 * UIScale)
     lbl.Position = UDim2.new(0, 14, 0, 6)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-    lbl.TextSize = 12 * UIScale
+    lbl.TextColor3 = Color3.fromRGB(230, 230, 255)
+    lbl.TextSize = 11 * UIScale
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = f
     
     local val = Instance.new("TextLabel")
-    val.Size = UDim2.new(0.3, 0, 0, 22 * UIScale)
-    val.Position = UDim2.new(0.7, 0, 0, 6)
+    val.Size = UDim2.new(0.35, 0, 0, 20 * UIScale)
+    val.Position = UDim2.new(0.65, 0, 0, 6)
     val.BackgroundTransparency = 1
     val.Text = tostring(Settings[key]) .. (suffix or "")
-    val.TextColor3 = Color3.fromRGB(255, 255, 255)
-    val.TextSize = 12 * UIScale
+    val.TextColor3 = Color3.fromRGB(0, 255, 255)
+    val.TextSize = 11 * UIScale
     val.Font = Enum.Font.GothamBold
     val.TextXAlignment = Enum.TextXAlignment.Right
     val.Parent = f
     
     local sbg = Instance.new("Frame")
-    sbg.Size = UDim2.new(1, -28, 0, 6)
-    sbg.Position = UDim2.new(0, 14, 0, 40 * UIScale)
-    sbg.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    sbg.Size = UDim2.new(1, -28, 0, 5)
+    sbg.Position = UDim2.new(0, 14, 0, 36 * UIScale)
+    sbg.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
     sbg.BorderSizePixel = 0
     sbg.Parent = f
     Instance.new("UICorner", sbg).CornerRadius = UDim.new(0, 3)
     
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new((Settings[key] - min) / (max - min), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    fill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
     fill.BorderSizePixel = 0
     fill.Parent = sbg
     Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 3)
     
     local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 16, 0, 16)
-    knob.Position = UDim2.new((Settings[key] - min) / (max - min), -8, 0.5, -8)
-    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.Size = UDim2.new(0, 14, 0, 14)
+    knob.Position = UDim2.new((Settings[key] - min) / (max - min), -7, 0.5, -7)
+    knob.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
     knob.BorderSizePixel = 0
     knob.Parent = sbg
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
     
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 30)
-    btn.Position = UDim2.new(0, 0, 0, 25)
+    btn.Size = UDim2.new(1, 0, 0, 28)
+    btn.Position = UDim2.new(0, 0, 0, 22)
     btn.BackgroundTransparency = 1
     btn.Text = ""
     btn.Parent = f
@@ -1522,7 +1590,7 @@ local function MakeSlider(parent, text, key, min, max, suffix)
             local value = math.floor(min + scale * (max - min))
             Settings[key] = value
             fill.Size = UDim2.new(scale, 0, 1, 0)
-            knob.Position = UDim2.new(scale, -8, 0.5, -8)
+            knob.Position = UDim2.new(scale, -7, 0.5, -7)
             val.Text = tostring(value) .. (suffix or "")
         end
     end)
@@ -1530,37 +1598,42 @@ local function MakeSlider(parent, text, key, min, max, suffix)
     return f
 end
 
+-- ============================================
+-- TAB CONTENTS
+-- ============================================
+
 -- ESP Tab
-MakeToggle(ESPContent, "ESP Master", "ESP_Enabled", "Show all players")
+MakeToggle(ESPContent, "ESP", "ESP", "Show all players with role")
 
 -- Combat Tab
-MakeToggle(CombatContent, "Auto Kill", "AutoKill_Enabled", "Auto throw kill at hiders")
-MakeSlider(CombatContent, "Kill Radius", "AutoKill_Radius", 5, 50, " studs")
-MakeSlider(CombatContent, "Kill Delay", "AutoKill_Delay", 0.01, 0.5, "s")
-MakeToggle(CombatContent, "Teleport Hider", "TeleportHider_Enabled", "Teleport to hiders")
-MakeSlider(CombatContent, "Teleport Delay", "TeleportHider_Delay", 0.5, 5, "s")
-MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Auto run from seekers")
-MakeSlider(CombatContent, "Safe Distance", "SafeDistance", 10, 60, " studs")
-MakeToggle(CombatContent, "Seeker Detector", "SeekerDetector", "Alert when seeker near")
-MakeSlider(CombatContent, "Detector Range", "DetectorRange", 50, 200, " studs")
+MakeToggle(CombatContent, "Auto Kill", "AutoKill", "Instant throw kill all hiders")
+MakeSlider(CombatContent, "Kill Radius", "AutoKillRadius", 10, 100, " studs")
+MakeToggle(CombatContent, "Teleport to Hider", "TeleportHider", "TP to hiders instantly")
+MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Auto escape from seekers")
+MakeSlider(CombatContent, "Safe Distance", "SafeDistance", 10, 80, " studs")
+MakeToggle(CombatContent, "Seeker Detector", "SeekerDetector", "Alert when seeker nearby")
+MakeSlider(CombatContent, "Detector Range", "DetectorRange", 50, 300, " studs")
 
 -- Misc Tab
-MakeToggle(MiscContent, "Auto Collect Coin", "AutoCoin_Enabled", "Auto collect coins instantly")
-MakeSlider(MiscContent, "Coin Delay", "AutoCoin_Delay", 0.01, 0.5, "s")
+MakeToggle(MiscContent, "Auto Collect Coin", "AutoCoin", "Instant collect all coins")
+MakeToggle(MiscContent, "Noclip", "Noclip", "Walk through walls")
+MakeToggle(MiscContent, "Fly", "Fly", "Fly mode (WASD + Space/Shift)")
 
 -- Player Tab
-MakeToggle(PlayerContent, "Speed Hack", "SpeedHack", "Fast run")
+MakeToggle(PlayerContent, "Speed Hack", "SpeedHack", "Super speed")
 MakeSlider(PlayerContent, "Speed Value", "SpeedValue", 16, 500, "")
-MakeToggle(PlayerContent, "Jump Hack", "JumpHack", "High jump")
+MakeToggle(PlayerContent, "Jump Hack", "JumpHack", "Super jump")
 MakeSlider(PlayerContent, "Jump Power", "JumpValue", 50, 300, "")
-MakeToggle(PlayerContent, "Noclip", "Noclip", "Walk through walls")
+MakeSlider(PlayerContent, "Fly Speed", "FlySpeed", 20, 200, "")
 
--- Drag menu
+-- ============================================
+-- DRAG SYSTEM
+-- ============================================
 local dragM = false
 local dragSP = nil
 local dragMP = nil
 
-Title.InputBegan:Connect(function(input)
+TitleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragM = true
         dragSP = input.Position
@@ -1581,15 +1654,17 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Toggle menu button
-local ToggleBtnSize = IsMobile and UDim2.new(0, 55, 0, 55) or UDim2.new(0, 50, 0, 50)
+-- ============================================
+-- TOGGLE BUTTON
+-- ============================================
+local ToggleBtnSize = IsMobile and UDim2.new(0, 52, 0, 52) or UDim2.new(0, 48, 0, 48)
 local MenuBtn = Instance.new("TextButton")
 MenuBtn.Name = "MenuToggle"
 MenuBtn.Size = ToggleBtnSize
-MenuBtn.Position = UDim2.new(0, 18, 0.5, -ToggleBtnSize.Y.Offset / 2)
-MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-MenuBtn.Text = "XY"
-MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MenuBtn.Position = UDim2.new(0, 16, 0.5, -ToggleBtnSize.Y.Offset / 2)
+MenuBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+MenuBtn.Text = "X"
+MenuBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
 MenuBtn.TextSize = 20 * UIScale
 MenuBtn.Font = Enum.Font.GothamBlack
 MenuBtn.Parent = SG
@@ -1597,151 +1672,100 @@ MenuBtn.Parent = SG
 Instance.new("UICorner", MenuBtn).CornerRadius = UDim.new(0, 14)
 
 local BtnStroke = Instance.new("UIStroke")
-BtnStroke.Color = Color3.fromRGB(255, 255, 255)
+BtnStroke.Color = Color3.fromRGB(0, 200, 255)
 BtnStroke.Thickness = 2
 BtnStroke.Parent = MenuBtn
 
+local -- ============================================
+-- PART 2 CONTINUED - UI MODERN (LANJUTAN)
+-- ============================================
+
+-- BtnGlow animation (lanjutan dari terputus)
 local BtnGlow = Instance.new("ImageLabel")
-BtnGlow.Size = UDim2.new(1.6, 0, 1.6, 0)
-BtnGlow.Position = UDim2.new(-0.3, 0, -0.3, 0)
+BtnGlow.Size = UDim2.new(1.5, 0, 1.5, 0)
+BtnGlow.Position = UDim2.new(-0.25, 0, -0.25, 0)
 BtnGlow.BackgroundTransparency = 1
 BtnGlow.Image = "rbxassetid://10822646370"
-BtnGlow.ImageColor3 = Color3.fromRGB(255, 255, 255)
-BtnGlow.ImageTransparency = 0.7
+BtnGlow.ImageColor3 = Color3.fromRGB(0, 200, 255)
+BtnGlow.ImageTransparency = 0.6
 BtnGlow.Parent = MenuBtn
 
 task.spawn(function()
     while MenuBtn.Parent do
-        TweenService:Create(BtnGlow, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.4}):Play()
-        task.wait(1.5)
-        TweenService:Create(BtnGlow, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.8}):Play()
-        task.wait(1.5)
+        TweenService:Create(BtnGlow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.3}):Play()
+        task.wait(1.2)
+        TweenService:Create(BtnGlow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.7}):Play()
+        task.wait(1.2)
     end
 end)
 
+-- MenuBtn click handler
 MenuBtn.MouseButton1Click:Connect(function()
     Main.Visible = not Main.Visible
     if Main.Visible then
-        MenuBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        MenuBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
         MenuBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-        TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = MenuSize}):Play()
+        TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Back), {Size = MenuSize}):Play()
     else
-        MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-        MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        MenuBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+        MenuBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
     end
 end)
 
+-- Minimize button
 MinBtn.MouseButton1Click:Connect(function()
     Main.Visible = false
-    MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-    MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MenuBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    MenuBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
 end)
 
+-- Close button
 CloseBtn.MouseButton1Click:Connect(function()
     Main.Visible = false
-    MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-    MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MenuBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    MenuBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
 end)
 
--- Keyboard shortcuts
+-- ============================================
+-- KEYBOARD SHORTCUTS
+-- ============================================
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     
+    -- Toggle menu: RightAlt
     if input.KeyCode == Enum.KeyCode.RightAlt then
         Main.Visible = not Main.Visible
         if Main.Visible then
-            MenuBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            MenuBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
             MenuBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
         else
-            MenuBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-            MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            MenuBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+            MenuBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
         end
     end
-    if input.KeyCode == Enum.KeyCode.Insert then Settings.ESP_Enabled = not Settings.ESP_Enabled end
-    if input.KeyCode == Enum.KeyCode.Home then Settings.AutoKill_Enabled = not Settings.AutoKill_Enabled end
-    if input.KeyCode == Enum.KeyCode.PageUp then Settings.TeleportHider_Enabled = not Settings.TeleportHider_Enabled end
-    if input.KeyCode == Enum.KeyCode.End then Settings.AutoCoin_Enabled = not Settings.AutoCoin_Enabled end
-    if input.KeyCode == Enum.KeyCode.Delete then Settings.SpeedHack = not Settings.SpeedHack end
-    if input.KeyCode == Enum.KeyCode.N then Settings.Noclip = not Settings.Noclip end
-end)
-
--- ============================================
--- ANTI-DETECTION
--- ============================================
-pcall(function()
-    local mt = getrawmetatable(game)
-    if mt then
-        setreadonly(mt, false)
-        local old = mt.__namecall
-        mt.__namecall = newcclosure(function(self, ...)
-            local m = getnamecallmethod()
-            if m == "FindFirstChild" or m == "WaitForChild" then
-                local a = {...}
-                if a[1] and (a[1]:match("ESP") or a[1]:match("Xyin") or a[1]:match("XYIN") or a[1]:match("Hub")) then
-                    return nil
-                end
-            end
-            return old(self, ...)
-        end)
-        setreadonly(mt, true)
+    
+    -- Hotkeys
+    if input.KeyCode == Enum.KeyCode.Insert then
+        Settings.ESP = not Settings.ESP
     end
-end)
-
--- ============================================
--- NOTIFICATION - BOTTOM RIGHT
--- ============================================
-local Notif = Instance.new("Frame")
-Notif.Size = UDim2.new(0, 350 * UIScale, 0, 70 * UIScale)
-Notif.Position = UDim2.new(1, 10, 1, 10)
-Notif.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
-Notif.BorderSizePixel = 0
-Notif.Parent = SG
-Instance.new("UICorner", Notif).CornerRadius = UDim.new(0, 14)
-
-local NotifStroke = Instance.new("UIStroke")
-NotifStroke.Color = Color3.fromRGB(255, 255, 255)
-NotifStroke.Thickness = 1
-NotifStroke.Parent = Notif
-
-local NotifTitle = Instance.new("TextLabel")
-NotifTitle.Size = UDim2.new(1, -20, 0, 22 * UIScale)
-NotifTitle.Position = UDim2.new(0, 10, 0, 6)
-NotifTitle.BackgroundTransparency = 1
-NotifTitle.Text = "KAMU TELAH MEMASUKI SCRIPT XYINHUB"
-NotifTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-NotifTitle.TextSize = 13 * UIScale
-NotifTitle.Font = Enum.Font.GothamBlack
-NotifTitle.Parent = Notif
-
-local NotifInfo = Instance.new("TextLabel")
-NotifInfo.Size = UDim2.new(1, -20, 0, 18 * UIScale)
-NotifInfo.Position = UDim2.new(0, 10, 0, 28)
-NotifInfo.BackgroundTransparency = 1
-NotifInfo.Text = "Username Roblox : " .. LocalPlayer.Name .. " | ID : " .. LocalPlayer.UserId
-NotifInfo.TextColor3 = Color3.fromRGB(180, 180, 180)
-NotifInfo.TextSize = 10 * UIScale
-NotifInfo.Font = Enum.Font.GothamBold
-NotifInfo.Parent = Notif
-
-local NotifVer = Instance.new("TextLabel")
-NotifVer.Size = UDim2.new(1, -20, 0, 16 * UIScale)
-NotifVer.Position = UDim2.new(0, 10, 0, 46)
-NotifVer.BackgroundTransparency = 1
-NotifVer.Text = "XYINHUB v7.1 | Paint or Seek | @RukanooXD_YT"
-NotifVer.TextColor3 = Color3.fromRGB(100, 100, 100)
-NotifVer.TextSize = 9 * UIScale
-NotifVer.Font = Enum.Font.Gotham
-NotifVer.Parent = Notif
-
--- ============================================
--- NOTIFICATION - BOTTOM RIGHT (CONTINUED)
--- ============================================
-Notif:TweenPosition(UDim2.new(1, -360 * UIScale, 1, -80 * UIScale), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.5)
-
-task.delay(8, function()
-    Notif:TweenPosition(UDim2.new(1, 10, 1, 10), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.4)
-    task.wait(0.5)
-    Notif:Destroy()
+    if input.KeyCode == Enum.KeyCode.Home then
+        Settings.AutoKill = not Settings.AutoKill
+    end
+    if input.KeyCode == Enum.KeyCode.PageUp then
+        Settings.TeleportHider = not Settings.TeleportHider
+    end
+    if input.KeyCode == Enum.KeyCode.End then
+        Settings.AutoCoin = not Settings.AutoCoin
+    end
+    if input.KeyCode == Enum.KeyCode.Delete then
+        Settings.SpeedHack = not Settings.SpeedHack
+    end
+    if input.KeyCode == Enum.KeyCode.N then
+        Settings.Noclip = not Settings.Noclip
+    end
+    if input.KeyCode == Enum.KeyCode.F then
+        Settings.Fly = not Settings.Fly
+    end
 end)
 
 -- ============================================
@@ -1751,52 +1775,140 @@ pcall(function()
     local mt = getrawmetatable(game)
     if mt then
         setreadonly(mt, false)
-        local old = mt.__namecall
+        local oldNamecall = mt.__namecall
         mt.__namecall = newcclosure(function(self, ...)
             local m = getnamecallmethod()
-            if m == "FindFirstChild" or m == "WaitForChild" then
+            if m == "FindFirstChild" or m == "WaitForChild" or m == "FindFirstChildOfClass" then
                 local a = {...}
-                if a[1] and (a[1]:match("ESP") or a[1]:match("Xyin") or a[1]:match("XYIN") or a[1]:match("Hub") or a[1]:match("MenuToggle") or a[1]:match("MainMenu")) then
-                    return nil
+                if a[1] and type(a[1]) == "string" then
+                    local name = a[1]:lower()
+                    if name:match("esp") or name:match("xyin") or name:match("hub") 
+                       or name:match("menu") or name:match("toggle") or name:match("script") then
+                        return nil
+                    end
                 end
             end
-            return old(self, ...)
+            return oldNamecall(self, ...)
         end)
-        setreadonly(mt, true)
-    end
-end)
-
-pcall(function()
-    local mt = getrawmetatable(game)
-    if mt then
-        setreadonly(mt, false)
+        
         local oldIndex = mt.__index
         mt.__index = newcclosure(function(self, k)
             if type(k) == "string" then
-                if k:match("ESP") or k:match("Xyin") or k:match("XYIN") or k:match("Hub") then
+                local kl = k:lower()
+                if kl:match("esp") or kl:match("xyin") or kl:match("hub") then
                     return nil
                 end
             end
             return oldIndex(self, k)
         end)
+        
         setreadonly(mt, true)
     end
 end)
 
 -- ============================================
--- FINAL PRINT & STATUS
+-- MODERN NOTIFICATION SYSTEM
 -- ============================================
-local function GetRole(p)
-    return GetPlayerRole(p)
-end
+local NotifFrame = Instance.new("Frame")
+NotifFrame.Size = UDim2.new(0, 360 * UIScale, 0, 80 * UIScale)
+NotifFrame.Position = UDim2.new(1, 20, 1, 20)
+NotifFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 22)
+NotifFrame.BorderSizePixel = 0
+NotifFrame.Parent = SG
+Instance.new("UICorner", NotifFrame).CornerRadius = UDim.new(0, 14)
 
-print("[XYINHUB] v7.1 Paint or Seek Edition LOADED")
-print("[XYINHUB] User: " .. LocalPlayer.Name .. " | ID: " .. LocalPlayer.UserId)
-print("[XYINHUB] Role: " .. GetRole(LocalPlayer))
-print("[XYINHUB] Device: " .. (IsMobile and "Mobile" or "PC"))
-print("[XYINHUB] Systems: ESP, AutoKill, AutoSafe, SeekerDetector, Speed, Jump, Noclip, AutoCoin, TeleportHider")
-print("[XYINHUB] @RukanooXD_YT")
-print("[XYINHUB] - .... . / .... .- -.-. -.- / .. ... / .-. . .- .-..")
+local NotifStroke = Instance.new("UIStroke")
+NotifStroke.Color = Color3.fromRGB(0, 200, 255)
+NotifStroke.Thickness = 1.5
+NotifStroke.Transparency = 0.4
+NotifStroke.Parent = NotifFrame
+
+local NotifAccent = Instance.new("Frame")
+NotifAccent.Size = UDim2.new(0, 4, 1, 0)
+NotifAccent.Position = UDim2.new(0, 0, 0, 0)
+NotifAccent.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+NotifAccent.BorderSizePixel = 0
+NotifAccent.Parent = NotifFrame
+Instance.new("UICorner", NotifAccent).CornerRadius = UDim.new(0, 14)
+
+local NotifTitle = Instance.new("TextLabel")
+NotifTitle.Size = UDim2.new(1, -24, 0, 24 * UIScale)
+NotifTitle.Position = UDim2.new(0, 14, 0, 8)
+NotifTitle.BackgroundTransparency = 1
+NotifTitle.Text = "XYINHUB v8.0 LOADED"
+NotifTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
+NotifTitle.TextSize = 14 * UIScale
+NotifTitle.Font = Enum.Font.GothamBlack
+NotifTitle.Parent = NotifFrame
+
+local NotifRole = Instance.new("TextLabel")
+NotifRole.Size = UDim2.new(1, -24, 0, 18 * UIScale)
+NotifRole.Position = UDim2.new(0, 14, 0, 32)
+NotifRole.BackgroundTransparency = 1
+NotifRole.Text = "Role: Detecting..."
+NotifRole.TextColor3 = Color3.fromRGB(180, 180, 200)
+NotifRole.TextSize = 10 * UIScale
+NotifRole.Font = Enum.Font.GothamBold
+NotifRole.Parent = NotifFrame
+
+-- Update role in notification
+task.spawn(function()
+    while NotifRole.Parent do
+        local role = GetPlayerRole(LocalPlayer)
+        NotifRole.Text = "User: " .. LocalPlayer.Name .. " | Role: " .. role .. " | " .. (GameState.InRound and "In Round" or "Lobby")
+        if role == "Seeker" then
+            NotifRole.TextColor3 = Color3.fromRGB(255, 100, 100)
+        elseif role == "Hider" then
+            NotifRole.TextColor3 = Color3.fromRGB(100, 255, 150)
+        else
+            NotifRole.TextColor3 = Color3.fromRGB(180, 180, 200)
+        end
+        task.wait(0.5)
+    end
+end)
+
+local NotifVer = Instance.new("TextLabel")
+NotifVer.Size = UDim2.new(1, -24, 0, 16 * UIScale)
+NotifVer.Position = UDim2.new(0, 14, 0, 52)
+NotifVer.BackgroundTransparency = 1
+NotifVer.Text = "Paint or Seek | @RukanooXD_YT"
+NotifVer.TextColor3 = Color3.fromRGB(100, 100, 120)
+NotifVer.TextSize = 9 * UIScale
+NotifVer.Font = Enum.Font.Gotham
+NotifVer.Parent = NotifFrame
+
+-- Animate notification in
+NotifFrame:TweenPosition(UDim2.new(1, -380 * UIScale, 1, -90 * UIScale), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.5)
+
+-- Auto dismiss
+task.delay(10, function()
+    NotifFrame:TweenPosition(UDim2.new(1, 20, 1, 20), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.4)
+    task.wait(0.5)
+    NotifFrame:Destroy()
+end)
+
+-- ============================================
+-- REAL-TIME ROLE DISPLAY IN MENU
+-- ============================================
+task.spawn(function()
+    while TitleBar and TitleBar.Parent do
+        local role = GetPlayerRole(LocalPlayer)
+        if RoleDisplay and RoleDisplay.Parent then
+            RoleDisplay.Text = "You: " .. role
+            if role == "Seeker" then
+                RoleDisplay.TextColor3 = Color3.fromRGB(255, 80, 80)
+                RoleDisplay.BackgroundColor3 = Color3.fromRGB(40, 15, 15)
+            elseif role == "Hider" then
+                RoleDisplay.TextColor3 = Color3.fromRGB(80, 255, 100)
+                RoleDisplay.BackgroundColor3 = Color3.fromRGB(15, 40, 20)
+            else
+                RoleDisplay.TextColor3 = Color3.fromRGB(0, 255, 255)
+                RoleDisplay.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+            end
+        end
+        task.wait(0.3)
+    end
+end)
 
 -- ============================================
 -- CLEANUP ON DESTROY
@@ -1811,10 +1923,25 @@ SG.Destroying:Connect(function()
     if SpeedPropConn then pcall(function() SpeedPropConn:Disconnect() end) end
     if JumpConn then pcall(function() JumpConn:Disconnect() end) end
     if NoclipConn then pcall(function() NoclipConn:Disconnect() end) end
-    DetectorText:Remove()
-    DetectorLine:Remove()
+    if FlyConn then pcall(function() FlyConn:Disconnect() end) end
+    if FlyBodyGyro then pcall(function() FlyBodyGyro:Destroy() end) end
+    if FlyBodyVelo then pcall(function() FlyBodyVelo:Destroy() end) end
+    pcall(function() DetectorText:Remove() end)
+    pcall(function() DetectorLine:Remove() end)
 end)
 
 -- ============================================
--- END OF XYINHUB v7.1
+-- FINAL PRINT
+-- ============================================
+print("[XYINHUB] v8.0 Paint or Seek Edition LOADED")
+print("[XYINHUB] User: " .. LocalPlayer.Name .. " | ID: " .. LocalPlayer.UserId)
+print("[XYINHUB] Role: " .. GetPlayerRole(LocalPlayer))
+print("[XYINHUB] Device: " .. (IsMobile and "Mobile" or "PC"))
+print("[XYINHUB] Systems: ESP, AutoKill, AutoSafe, SeekerDetector, Speed, Jump, Noclip, Fly, AutoCoin, TeleportHider")
+print("[XYINHUB] Hotkeys: RightAlt=Menu | Insert=ESP | Home=AutoKill | PageUp=TPHider | End=Coin | Delete=Speed | N=Noclip | F=Fly")
+print("[XYINHUB] @RukanooXD_YT")
+print("[XYINHUB] - .... . / .... .- -.-. -.- / .. ... / .-. . .- .-..")
+
+-- ============================================
+-- END OF XYINHUB v8.0
 -- ============================================
