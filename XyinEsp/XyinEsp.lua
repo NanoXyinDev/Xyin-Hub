@@ -1,9 +1,11 @@
 -- ============================================
--- XYINHUB v7.0 - PAINT OR SEEK EDITION
+-- XYINHUB v7.1 - PAINT OR SEEK EDITION
 -- @RukanooXD_YT
 -- Game: Paint or Seek
--- Features: ESP, Auto Kill, Auto Coin, Auto Safe,
--- Seeker Detector, Speed, Jump, Cinematic UI
+-- Features: ESP, Auto Kill (Fast Touch), Auto Coin,
+-- Auto Safe, Seeker Detector, Speed, Jump, Noclip
+-- FIX: Auto Kill only in round, distance check,
+-- Fast Kill tool touch simulation, Noclip added
 -- NO DELAY, INSTANT EXECUTE
 -- ============================================
 
@@ -30,7 +32,7 @@ local Settings = {
     MaxDistance = 1000,
     AutoKill_Enabled = false,
     AutoKill_Radius = 30,
-    AutoKill_Delay = 0.1,
+    AutoKill_Delay = 0.05,
     TeleportHider_Enabled = false,
     TeleportHider_Delay = 1.5,
     AutoCoin_Enabled = false,
@@ -44,6 +46,7 @@ local Settings = {
     SafeDistance = 25,
     SeekerDetector = false,
     DetectorRange = 100,
+    Noclip = false,
 }
 
 -- ============================================
@@ -343,7 +346,8 @@ local function UpdateESP()
 end
 
 -- ============================================
--- AUTO KILL - TELEPORT + AUTO SWING (PAINT OR SEEK)
+-- AUTO KILL - FAST TOOL TOUCH SIMULATION
+-- FIX: Only in round, strict distance check
 -- ============================================
 local AutoKillConn = nil
 
@@ -370,14 +374,18 @@ local function StartAutoKill()
     if AutoKillConn then return end
     AutoKillConn = RunService.Heartbeat:Connect(function()
         if not Settings.AutoKill_Enabled then return end
-        if not AmISeeker() then return end
         if not GameState.InRound then return end
+        if not AmISeeker() then return end
         
         local lChar = LocalPlayer.Character
         local lHRP = lChar and GetHRP(LocalPlayer)
         if not lHRP then return end
         
         local tool = GetTool()
+        if not tool then return end
+        
+        local handle = tool:FindFirstChild("Handle")
+        if not handle then return end
         
         for _, p in ipairs(Players:GetPlayers()) do
             if p == LocalPlayer then continue end
@@ -385,37 +393,48 @@ local function StartAutoKill()
             
             local c = p.Character
             local hrp = c and GetHRP(p)
-            local hum = c and c:FindFirstChildOfClass("Humanoid")
-            if not hrp or not hum then continue end
+            if not hrp then continue end
             
             local dist = (hrp.Position - lHRP.Position).Magnitude
-            if dist <= Settings.AutoKill_Radius then
-                local oldCFrame = lHRP.CFrame
-                lHRP.CFrame = hrp.CFrame * CFrame.new(0, 0, 3)
+            if dist > Settings.AutoKill_Radius then continue end
+            
+            -- FAST KILL: Move tool Handle to target HRP, fire touch, return
+            pcall(function()
+                local oldCFrame = handle.CFrame
+                local oldParent = handle.Parent
                 
-                if tool then
-                    pcall(function()
-                        tool:Activate()
-                        local handle = tool:FindFirstChild("Handle")
-                        if handle then
-                            firetouchinterest(handle, hrp, 0)
-                            firetouchinterest(handle, hrp, 1)
-                        end
-                    end)
+                -- Teleport tool handle to target
+                handle.CFrame = hrp.CFrame * CFrame.new(0, 0, 2)
+                
+                -- Activate tool
+                tool:Activate()
+                
+                -- Fire touch with handle to target body parts
+                firetouchinterest(handle, hrp, 0)
+                firetouchinterest(handle, hrp, 1)
+                
+                -- Fire touch with all target parts
+                for _, part in ipairs(c:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        firetouchinterest(handle, part, 0)
+                        firetouchinterest(handle, part, 1)
+                    end
                 end
                 
-                pcall(function()
-                    for _, part in ipairs(lChar:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            firetouchinterest(part, hrp, 0)
-                            firetouchinterest(part, hrp, 1)
-                        end
+                -- Fire touch with local body parts to target
+                for _, part in ipairs(lChar:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        firetouchinterest(part, hrp, 0)
+                        firetouchinterest(part, hrp, 1)
                     end
-                end)
+                end
                 
-                task.wait(0.05)
-                lHRP.CFrame = oldCFrame
-            end
+                task.wait(0.03)
+                
+                -- Return handle
+                handle.CFrame = oldCFrame
+            end)
+            
             task.wait(Settings.AutoKill_Delay)
         end
     end)
@@ -676,6 +695,25 @@ local function StartJumpHack()
 end
 
 -- ============================================
+-- NOCLIP - NEW FEATURE
+-- ============================================
+local NoclipConn = nil
+
+local function StartNoclip()
+    if NoclipConn then return end
+    NoclipConn = RunService.Stepped:Connect(function()
+        if not Settings.Noclip then return end
+        local c = LocalPlayer.Character
+        if not c then return end
+        for _, part in ipairs(c:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
+-- ============================================
 -- TELEPORT HIDER
 -- ============================================
 local TPConn = nil
@@ -909,6 +947,7 @@ StartAutoSafe()
 StartSeekerDetector()
 StartSpeedHack()
 StartJumpHack()
+StartNoclip()
 StartTP()
 StartCoin()
 
@@ -1031,7 +1070,7 @@ local Sub = Instance.new("TextLabel")
 Sub.Size = UDim2.new(0, 600, 0, 25 * UIScale)
 Sub.Position = UDim2.new(0.5, -300, 0.37, 0)
 Sub.BackgroundTransparency = 1
-Sub.Text = "Paint or Seek Edition | v7.0 | Premium Script"
+Sub.Text = "Paint or Seek Edition | v7.1 | Premium Script"
 Sub.TextColor3 = Color3.fromRGB(120, 120, 120)
 Sub.TextSize = 13 * UIScale
 Sub.Font = Enum.Font.Gotham
@@ -1180,7 +1219,7 @@ local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(1, -120, 0, 28 * UIScale)
 TitleText.Position = UDim2.new(0, 18, 0, 6)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "XYINHUB v7.0"
+TitleText.Text = "XYINHUB v7.1"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.TextSize = 18 * UIScale
 TitleText.Font = Enum.Font.GothamBlack
@@ -1480,6 +1519,7 @@ MakeToggle(PlayerContent, "Speed Hack", "SpeedHack", "Fast run")
 MakeSlider(PlayerContent, "Speed Value", "SpeedValue", 16, 500, "")
 MakeToggle(PlayerContent, "Jump Hack", "JumpHack", "High jump")
 MakeSlider(PlayerContent, "Jump Power", "JumpValue", 50, 300, "")
+MakeToggle(PlayerContent, "Noclip", "Noclip", "Walk through walls")
 
 -- Drag menu
 local dragM = false
@@ -1588,6 +1628,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     if input.KeyCode == Enum.KeyCode.PageUp then Settings.TeleportHider_Enabled = not Settings.TeleportHider_Enabled end
     if input.KeyCode == Enum.KeyCode.End then Settings.AutoCoin_Enabled = not Settings.AutoCoin_Enabled end
     if input.KeyCode == Enum.KeyCode.Delete then Settings.SpeedHack = not Settings.SpeedHack end
+    if input.KeyCode == Enum.KeyCode.N then Settings.Noclip = not Settings.Noclip end
 end)
 
 -- ============================================
@@ -1652,12 +1693,15 @@ local NotifVer = Instance.new("TextLabel")
 NotifVer.Size = UDim2.new(1, -20, 0, 16 * UIScale)
 NotifVer.Position = UDim2.new(0, 10, 0, 46)
 NotifVer.BackgroundTransparency = 1
-NotifVer.Text = "XYINHUB v7.0 | Paint or Seek | @RukanooXD_YT"
+NotifVer.Text = "XYINHUB v7.1 | Paint or Seek | @RukanooXD_YT"
 NotifVer.TextColor3 = Color3.fromRGB(100, 100, 100)
 NotifVer.TextSize = 9 * UIScale
 NotifVer.Font = Enum.Font.Gotham
 NotifVer.Parent = Notif
 
+-- ============================================
+-- NOTIFICATION - BOTTOM RIGHT (CONTINUED)
+-- ============================================
 Notif:TweenPosition(UDim2.new(1, -360 * UIScale, 1, -80 * UIScale), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.5)
 
 task.delay(8, function()
@@ -1667,10 +1711,76 @@ task.delay(8, function()
 end)
 
 -- ============================================
--- FINAL PRINT
+-- ANTI-DETECTION ENHANCED
 -- ============================================
-print("[XYINHUB] v7.0 Paint or Seek Edition LOADED")
+pcall(function()
+    local mt = getrawmetatable(game)
+    if mt then
+        setreadonly(mt, false)
+        local old = mt.__namecall
+        mt.__namecall = newcclosure(function(self, ...)
+            local m = getnamecallmethod()
+            if m == "FindFirstChild" or m == "WaitForChild" then
+                local a = {...}
+                if a[1] and (a[1]:match("ESP") or a[1]:match("Xyin") or a[1]:match("XYIN") or a[1]:match("Hub") or a[1]:match("MenuToggle") or a[1]:match("MainMenu")) then
+                    return nil
+                end
+            end
+            return old(self, ...)
+        end)
+        setreadonly(mt, true)
+    end
+end)
+
+pcall(function()
+    local mt = getrawmetatable(game)
+    if mt then
+        setreadonly(mt, false)
+        local oldIndex = mt.__index
+        mt.__index = newcclosure(function(self, k)
+            if type(k) == "string" then
+                if k:match("ESP") or k:match("Xyin") or k:match("XYIN") or k:match("Hub") then
+                    return nil
+                end
+            end
+            return oldIndex(self, k)
+        end)
+        setreadonly(mt, true)
+    end
+end)
+
+-- ============================================
+-- FINAL PRINT & STATUS
+-- ============================================
+local function GetRole(p)
+    return GetPlayerRole(p)
+end
+
+print("[XYINHUB] v7.1 Paint or Seek Edition LOADED")
 print("[XYINHUB] User: " .. LocalPlayer.Name .. " | ID: " .. LocalPlayer.UserId)
 print("[XYINHUB] Role: " .. GetRole(LocalPlayer))
 print("[XYINHUB] Device: " .. (IsMobile and "Mobile" or "PC"))
+print("[XYINHUB] Systems: ESP, AutoKill, AutoSafe, SeekerDetector, Speed, Jump, Noclip, AutoCoin, TeleportHider")
 print("[XYINHUB] @RukanooXD_YT")
+print("[XYINHUB] - .... . / .... .- -.-. -.- / .. ... / .-. . .- .-..")
+
+-- ============================================
+-- CLEANUP ON DESTROY
+-- ============================================
+SG.Destroying:Connect(function()
+    for _, o in pairs(ESPObjects) do
+        for _, obj in pairs(o) do pcall(function() obj:Remove() end) end
+    end
+    if AutoKillConn then pcall(function() AutoKillConn:Disconnect() end) end
+    if SafeConn then pcall(function() SafeConn:Disconnect() end) end
+    if SpeedConn then pcall(function() SpeedConn:Disconnect() end) end
+    if SpeedPropConn then pcall(function() SpeedPropConn:Disconnect() end) end
+    if JumpConn then pcall(function() JumpConn:Disconnect() end) end
+    if NoclipConn then pcall(function() NoclipConn:Disconnect() end) end
+    DetectorText:Remove()
+    DetectorLine:Remove()
+end)
+
+-- ============================================
+-- END OF XYINHUB v7.1
+-- ============================================
