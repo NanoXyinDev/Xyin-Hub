@@ -1,8 +1,8 @@
 -- ============================================
--- XYINHUB v8.1 - PAINT OR SEEK EDITION
+-- XYINHUB v9.0 - PAINT OR SEEK EDITION
 -- @RukanooXD_YT
--- Fixed: Syntax errors, Unicode corruption,
--- Role detection delay, AutoKill, AutoCoin optimization
+-- Full rewrite: Zero delay, strict InRound checks,
+-- enhanced role detection, no radius limits
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -27,7 +27,7 @@ local Settings = {
     ESP = false,
     MaxDistance = 1500,
     AutoKill = false,
-    AutoKillRadius = 50,
+    AutoKillRadius = 9999,
     TeleportHider = false,
     AutoCoin = false,
     SpeedHack = false,
@@ -35,12 +35,10 @@ local Settings = {
     JumpHack = false,
     JumpValue = 150,
     AutoSafe = false,
-    SafeDistance = 30,
+    SafeDistance = 40,
     SeekerDetector = false,
-    DetectorRange = 150,
+    DetectorRange = 300,
     Noclip = false,
-    Fly = false,
-    FlySpeed = 80,
 }
 
 -- ============================================
@@ -62,7 +60,7 @@ local function UpdateGameState()
                 local text = gui.Text:lower()
                 if text:match("round ends") or text:match("hiders left") or text:match("seekers left") 
                    or text:match("hiders:%s*%d+") or text:match("seekers:%s*%d+")
-                   or text:match("time:") or text:match("timer:") then
+                   or text:match("time:") or text:match("timer:") or text:match("time remaining") then
                     inRound = true
                 end
                 if text:match("you:%s*seeker") or text:match("you%s*seeker") 
@@ -128,16 +126,16 @@ local RoleCache = {}
 local function GetPlayerRole(p)
     if not p then return "Unknown" end
     
-    -- Check cache first for non-localplayer (refresh every 2s)
+    -- Check cache first for non-localplayer (refresh every 1s)
     if p ~= LocalPlayer and RoleCache[p] then
-        if tick() - RoleCache[p].time < 2 then
+        if tick() - RoleCache[p].time < 1 then
             return RoleCache[p].role
         end
     end
     
     local role = "Unknown"
     
-    -- Method 1: PlayerGui text
+    -- Method 1: PlayerGui text (priority for local player)
     local playerGui = p:FindFirstChild("PlayerGui")
     if playerGui then
         for _, gui in ipairs(playerGui:GetDescendants()) do
@@ -231,7 +229,7 @@ local function GetPlayerRole(p)
         end
     end
     
-    -- Method 6: Local inference
+    -- Method 6: Team inference
     if role == "Unknown" then
         if p == LocalPlayer then
             if GameState.MyRole ~= "Unknown" then
@@ -321,6 +319,7 @@ end
 -- ESP UPDATE
 -- ============================================
 local function UpdateESP()
+    -- Force invisible in lobby
     if not Settings.ESP or not GameState.InRound then
         for _, o in pairs(ESPObjects) do
             for _, obj in pairs(o) do pcall(function() obj.Visible = false end) end
@@ -439,7 +438,7 @@ local function UpdateESP()
 end
 
 -- ============================================
--- AUTO KILL - FIXED: SPAM ACTIVATE + TOUCH
+-- AUTO KILL — ZERO DELAY, NO RADIUS LIMIT
 -- ============================================
 local AutoKillConn = nil
 
@@ -489,22 +488,20 @@ local function StartAutoKill()
             local hrp = c and GetHRP(p)
             if not hrp then continue end
             
-            local dist = (hrp.Position - lHRP.Position).Magnitude
-            if dist > Settings.AutoKillRadius then continue end
+            -- NO RADIUS CHECK — kill all hiders on map
             
-            -- SPAM KILL: Multiple activations + touch in single frame
             pcall(function()
                 local oldCFrame = lHRP.CFrame
                 
                 -- Face target
                 lHRP.CFrame = CFrame.new(lHRP.Position, hrp.Position)
                 
-                -- Spam activate 3x
-                for i = 1, 3 do
+                -- Spam activate 5x
+                for i = 1, 5 do
                     tool:Activate()
                 end
                 
-                -- Handle teleport + touch spam
+                -- Handle teleport + touch spam ke SEMUA body parts
                 if handle then
                     local oldHandleCF = handle.CFrame
                     
@@ -547,7 +544,7 @@ local function StartAutoKill()
 end
 
 -- ============================================
--- AUTO SAFE
+-- AUTO SAFE — ZERO DELAY, HEARTBEAT
 -- ============================================
 local SafeConn = nil
 local LastSafeTeleport = 0
@@ -586,7 +583,7 @@ local function StartAutoSafe()
         
         if nearestSeeker and nearestDist < Settings.SafeDistance then
             local awayDir = (lHRP.Position - nearestSeeker.Position).Unit
-            local safePos = lHRP.Position + awayDir * 30
+            local safePos = lHRP.Position + awayDir * 40
             safePos = Vector3.new(
                 math.clamp(safePos.X, -500, 500),
                 math.max(safePos.Y, 5),
@@ -604,7 +601,7 @@ local function StartAutoSafe()
 end
 
 -- ============================================
--- SEEKER DETECTOR
+-- SEEKER DETECTOR — FLASHING RED
 -- ============================================
 local DetectorText = CreateDrawing("Text", {
     Text = "",
@@ -690,7 +687,7 @@ local function StartSeekerDetector()
 end
 
 -- ============================================
--- SPEED HACK
+-- SPEED HACK — ANTI-RESET
 -- ============================================
 local SpeedConn = nil
 local SpeedPropConn = nil
@@ -791,81 +788,7 @@ local function StartNoclip()
 end
 
 -- ============================================
--- FLY
--- ============================================
-local FlyConn = nil
-local FlyBodyGyro = nil
-local FlyBodyVelo = nil
-
-local function StartFly()
-    if FlyConn then return end
-    
-    LocalPlayer.CharacterAdded:Connect(function(char)
-        if FlyBodyGyro then FlyBodyGyro:Destroy() end
-        if FlyBodyVelo then FlyBodyVelo:Destroy() end
-        FlyBodyGyro = nil
-        FlyBodyVelo = nil
-    end)
-    
-    FlyConn = RunService.RenderStepped:Connect(function()
-        if not Settings.Fly then
-            if FlyBodyGyro then FlyBodyGyro:Destroy() FlyBodyGyro = nil end
-            if FlyBodyVelo then FlyBodyVelo:Destroy() FlyBodyVelo = nil end
-            return
-        end
-        
-        local c = LocalPlayer.Character
-        local hrp = c and GetHRP(LocalPlayer)
-        if not hrp then return end
-        
-        if not FlyBodyGyro then
-            FlyBodyGyro = Instance.new("BodyGyro")
-            FlyBodyGyro.P = 9e4
-            FlyBodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-            FlyBodyGyro.CFrame = hrp.CFrame
-            FlyBodyGyro.Parent = hrp
-        end
-        
-        if not FlyBodyVelo then
-            FlyBodyVelo = Instance.new("BodyVelocity")
-            FlyBodyVelo.Velocity = Vector3.new(0, 0, 0)
-            FlyBodyVelo.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-            FlyBodyVelo.Parent = hrp
-        end
-        
-        local camCF = Camera.CFrame
-        local moveDir = Vector3.new(0, 0, 0)
-        
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            moveDir = moveDir + camCF.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            moveDir = moveDir - camCF.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            moveDir = moveDir - camCF.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            moveDir = moveDir + camCF.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            moveDir = moveDir + Vector3.new(0, 1, 0)
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-            moveDir = moveDir - Vector3.new(0, 1, 0)
-        end
-        
-        if moveDir.Magnitude > 0 then
-            moveDir = moveDir.Unit * Settings.FlySpeed
-        end
-        
-        FlyBodyGyro.CFrame = camCF
-        FlyBodyVelo.Velocity = moveDir
-    end)
-end
-
--- ============================================
--- TELEPORT HIDER
+-- TELEPORT HIDER — ZERO DELAY
 -- ============================================
 local TPConn = nil
 
@@ -874,6 +797,10 @@ local function StartTP()
     TPConn = task.spawn(function()
         while true do
             if not Settings.TeleportHider then
+                task.wait(0.5)
+                continue
+            end
+            if not GameState.InRound then
                 task.wait(0.5)
                 continue
             end
@@ -896,17 +823,15 @@ local function StartTP()
                     break
                 end
             end
-            task.wait(0.1)
+            task.wait(0.05)
         end
     end)
 end
 
 -- ============================================
--- AUTO COIN - OPTIMIZED WITH CACHE
+-- AUTO COIN — ZERO DELAY, DIRECT COLLECT
 -- ============================================
 local CoinConn = nil
-local CachedCoins = {}
-local LastCoinUpdate = 0
 
 local function IsCoin(obj)
     if not obj or not obj.Parent then return false end
@@ -935,42 +860,8 @@ local function IsCoin(obj)
         if n:match(bl) then return false end
     end
     
-    local hasTouch = obj:FindFirstChildWhichIsA("TouchInterest") ~= nil
-    local hasPrompt = obj:FindFirstChildWhichIsA("ProximityPrompt") ~= nil
-    local hasClick = obj:FindFirstChildWhichIsA("ClickDetector") ~= nil
-    
-    if not hasPrompt then
-        hasPrompt = obj.Parent and obj.Parent:FindFirstChildWhichIsA("ProximityPrompt") ~= nil
-    end
-    
-    return hasTouch or hasPrompt or hasClick
+    return true
 end
-
-local function UpdateCoinCache()
-    CachedCoins = {}
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if IsCoin(obj) then
-            table.insert(CachedCoins, obj)
-        end
-    end
-    LastCoinUpdate = tick()
-end
-
--- Event-based coin tracking
-Workspace.DescendantAdded:Connect(function(obj)
-    if IsCoin(obj) then
-        table.insert(CachedCoins, obj)
-    end
-end)
-
-Workspace.DescendantRemoving:Connect(function(obj)
-    for i, coin in ipairs(CachedCoins) do
-        if coin == obj then
-            table.remove(CachedCoins, i)
-            break
-        end
-    end
-end)
 
 local function StartCoin()
     if CoinConn then return end
@@ -981,51 +872,43 @@ local function StartCoin()
                 continue
             end
             
-            -- Refresh cache every 5 seconds
-            if tick() - LastCoinUpdate > 5 then
-                UpdateCoinCache()
-            end
-            
             local lChar = LocalPlayer.Character
             local lHRP = lChar and GetHRP(LocalPlayer)
             
             if lHRP then
-                for _, coin in ipairs(CachedCoins) do
+                for _, obj in ipairs(Workspace:GetDescendants()) do
                     if not Settings.AutoCoin then break end
-                    if not coin or not coin.Parent then continue end
+                    if not IsCoin(obj) then continue end
                     
-                    local dist = (coin.Position - lHRP.Position).Magnitude
-                    if dist < 400 then
-                        pcall(function()
-                            local oldPos = lHRP.CFrame
-                            lHRP.CFrame = coin.CFrame * CFrame.new(0, 2, 0)
-                            
-                            firetouchinterest(lHRP, coin, 0)
-                            firetouchinterest(lHRP, coin, 1)
-                            
-                            for _, part in ipairs(lChar:GetDescendants()) do
-                                if part:IsA("BasePart") then
-                                    firetouchinterest(part, coin, 0)
-                                    firetouchinterest(part, coin, 1)
-                                end
+                    pcall(function()
+                        local oldPos = lHRP.CFrame
+                        lHRP.CFrame = obj.CFrame * CFrame.new(0, 2, 0)
+                        
+                        firetouchinterest(lHRP, obj, 0)
+                        firetouchinterest(lHRP, obj, 1)
+                        
+                        for _, part in ipairs(lChar:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                firetouchinterest(part, obj, 0)
+                                firetouchinterest(part, obj, 1)
                             end
-                            
-                            local prompt = coin:FindFirstChildWhichIsA("ProximityPrompt")
-                            if not prompt and coin.Parent then
-                                prompt = coin.Parent:FindFirstChildWhichIsA("ProximityPrompt")
-                            end
-                            if prompt then
-                                fireproximityprompt(prompt)
-                            end
-                            
-                            local clicker = coin:FindFirstChildWhichIsA("ClickDetector")
-                            if clicker then
-                                fireclickdetector(clicker)
-                            end
-                            
-                            lHRP.CFrame = oldPos
-                        end)
-                    end
+                        end
+                        
+                        local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt")
+                        if not prompt and obj.Parent then
+                            prompt = obj.Parent:FindFirstChildWhichIsA("ProximityPrompt")
+                        end
+                        if prompt then
+                            fireproximityprompt(prompt)
+                        end
+                        
+                        local clicker = obj:FindFirstChildWhichIsA("ClickDetector")
+                        if clicker then
+                            fireclickdetector(clicker)
+                        end
+                        
+                        lHRP.CFrame = oldPos
+                    end)
                 end
             end
             task.wait(0.05)
@@ -1055,12 +938,11 @@ StartSeekerDetector()
 StartSpeedHack()
 StartJumpHack()
 StartNoclip()
-StartFly()
 StartTP()
 StartCoin()
 
 -- ============================================
--- MODERN UI - FIXED UNICODE & SYNTAX
+-- MODERN GLASSMORPHISM UI v9.0
 -- ============================================
 local SG_UI = Instance.new("ScreenGui")
 SG_UI.Name = "XyinHub_" .. tostring(math.random(10000, 99999))
@@ -1073,7 +955,7 @@ local Watermark = Instance.new("TextLabel")
 Watermark.Size = UDim2.new(0, 250, 0, 20)
 Watermark.Position = UDim2.new(1, -260, 0, 10)
 Watermark.BackgroundTransparency = 1
-Watermark.Text = "@RukanooXD_YT | XYINHUB v8.1"
+Watermark.Text = "@RukanooXD_YT | XYINHUB v9.0"
 Watermark.TextColor3 = Color3.fromRGB(0, 255, 255)
 Watermark.TextSize = 11
 Watermark.Font = Enum.Font.GothamBold
@@ -1134,7 +1016,7 @@ local SubText = Instance.new("TextLabel")
 SubText.Size = UDim2.new(0, 500, 0, 24 * UIScale)
 SubText.Position = UDim2.new(0.5, -250, 0.38, 0)
 SubText.BackgroundTransparency = 1
-SubText.Text = "Paint or Seek Edition | v8.1"
+SubText.Text = "Paint or Seek Edition | v9.0"
 SubText.TextColor3 = Color3.fromRGB(100, 200, 255)
 SubText.TextSize = 14 * UIScale
 SubText.Font = Enum.Font.GothamBold
@@ -1312,7 +1194,7 @@ local TitleSub = Instance.new("TextLabel")
 TitleSub.Size = UDim2.new(0, 200, 0, 16 * UIScale)
 TitleSub.Position = UDim2.new(0, 48, 0, 30)
 TitleSub.BackgroundTransparency = 1
-TitleSub.Text = "Paint or Seek | v8.1"
+TitleSub.Text = "Paint or Seek | v9.0"
 TitleSub.TextColor3 = Color3.fromRGB(100, 150, 200)
 TitleSub.TextSize = 9 * UIScale
 TitleSub.Font = Enum.Font.GothamBold
@@ -1621,24 +1503,22 @@ MakeToggle(ESPContent, "ESP", "ESP", "Show all players with role")
 
 -- Combat Tab
 MakeToggle(CombatContent, "Auto Kill", "AutoKill", "Instant throw kill all hiders")
-MakeSlider(CombatContent, "Kill Radius", "AutoKillRadius", 10, 100, " studs")
+MakeSlider(CombatContent, "Kill Radius", "AutoKillRadius", 10, 9999, " studs")
 MakeToggle(CombatContent, "Teleport to Hider", "TeleportHider", "TP to hiders instantly")
 MakeToggle(CombatContent, "Auto Safe", "AutoSafe", "Auto escape from seekers")
 MakeSlider(CombatContent, "Safe Distance", "SafeDistance", 10, 80, " studs")
 MakeToggle(CombatContent, "Seeker Detector", "SeekerDetector", "Alert when seeker nearby")
-MakeSlider(CombatContent, "Detector Range", "DetectorRange", 50, 300, " studs")
+MakeSlider(CombatContent, "Detector Range", "DetectorRange", 50, 500, " studs")
 
 -- Misc Tab
 MakeToggle(MiscContent, "Auto Collect Coin", "AutoCoin", "Instant collect all coins")
 MakeToggle(MiscContent, "Noclip", "Noclip", "Walk through walls")
-MakeToggle(MiscContent, "Fly", "Fly", "Fly mode (WASD + Space/Shift)")
 
 -- Player Tab
 MakeToggle(PlayerContent, "Speed Hack", "SpeedHack", "Super speed")
 MakeSlider(PlayerContent, "Speed Value", "SpeedValue", 16, 500, "")
 MakeToggle(PlayerContent, "Jump Hack", "JumpHack", "Super jump")
 MakeSlider(PlayerContent, "Jump Power", "JumpValue", 50, 300, "")
-MakeSlider(PlayerContent, "Fly Speed", "FlySpeed", 20, 200, "")
 
 -- ============================================
 -- DRAG SYSTEM
@@ -1690,7 +1570,6 @@ BtnStroke.Color = Color3.fromRGB(0, 200, 255)
 BtnStroke.Thickness = 2
 BtnStroke.Parent = MenuBtn
 
--- FIXED: No broken 'local' here, direct continuation
 local BtnGlow = Instance.new("ImageLabel")
 BtnGlow.Size = UDim2.new(1.5, 0, 1.5, 0)
 BtnGlow.Position = UDim2.new(-0.25, 0, -0.25, 0)
@@ -1703,14 +1582,12 @@ BtnGlow.Parent = MenuBtn
 task.spawn(function()
     while MenuBtn.Parent do
         TweenService:Create(BtnGlow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.3}):Play()
-       
         task.wait(1.2)
         TweenService:Create(BtnGlow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.7}):Play()
         task.wait(1.2)
     end
 end)
 
--- MenuBtn click handler
 MenuBtn.MouseButton1Click:Connect(function()
     Main.Visible = not Main.Visible
     if Main.Visible then
@@ -1723,14 +1600,12 @@ MenuBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Minimize button
 MinBtn.MouseButton1Click:Connect(function()
     Main.Visible = false
     MenuBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
     MenuBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
 end)
 
--- Close button
 CloseBtn.MouseButton1Click:Connect(function()
     Main.Visible = false
     MenuBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
@@ -1771,9 +1646,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
     if input.KeyCode == Enum.KeyCode.N then
         Settings.Noclip = not Settings.Noclip
-    end
-    if input.KeyCode == Enum.KeyCode.F then
-        Settings.Fly = not Settings.Fly
     end
 end)
 
@@ -1834,7 +1706,7 @@ NotifStroke.Parent = NotifFrame
 
 local NotifAccent = Instance.new("Frame")
 NotifAccent.Size = UDim2.new(0, 4, 1, 0)
-NotifAccent.Position = UDim2.new(0, 0, 0, 0)
+NotifAccent.Position = UDim2.new(0, 0, 0, 0, 0)
 NotifAccent.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
 NotifAccent.BorderSizePixel = 0
 NotifAccent.Parent = NotifFrame
@@ -1844,7 +1716,7 @@ local NotifTitle = Instance.new("TextLabel")
 NotifTitle.Size = UDim2.new(1, -24, 0, 24 * UIScale)
 NotifTitle.Position = UDim2.new(0, 14, 0, 8)
 NotifTitle.BackgroundTransparency = 1
-NotifTitle.Text = "XYINHUB v8.1 LOADED"
+NotifTitle.Text = "XYINHUB v9.0 LOADED"
 NotifTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
 NotifTitle.TextSize = 14 * UIScale
 NotifTitle.Font = Enum.Font.GothamBlack
@@ -1906,9 +1778,6 @@ SG_UI.Destroying:Connect(function()
     if SpeedPropConn then pcall(function() SpeedPropConn:Disconnect() end) end
     if JumpConn then pcall(function() JumpConn:Disconnect() end) end
     if NoclipConn then pcall(function() NoclipConn:Disconnect() end) end
-    if FlyConn then pcall(function() FlyConn:Disconnect() end) end
-    if FlyBodyGyro then pcall(function() FlyBodyGyro:Destroy() end) end
-    if FlyBodyVelo then pcall(function() FlyBodyVelo:Destroy() end) end
     pcall(function() DetectorText:Remove() end)
     pcall(function() DetectorLine:Remove() end)
 end)
@@ -1916,15 +1785,15 @@ end)
 -- ============================================
 -- FINAL PRINT
 -- ============================================
-print("[XYINHUB] v8.1 Paint or Seek Edition LOADED")
+print("[XYINHUB] v9.0 Paint or Seek Edition LOADED")
 print("[XYINHUB] User: " .. LocalPlayer.Name .. " | ID: " .. LocalPlayer.UserId)
 print("[XYINHUB] Role: " .. GetPlayerRole(LocalPlayer))
 print("[XYINHUB] Device: " .. (IsMobile and "Mobile" or "PC"))
-print("[XYINHUB] Systems: ESP, AutoKill, AutoSafe, SeekerDetector, Speed, Jump, Noclip, Fly, AutoCoin, TeleportHider")
-print("[XYINHUB] Hotkeys: RightAlt=Menu | Insert=ESP | Home=AutoKill | PageUp=TPHider | End=Coin | Delete=Speed | N=Noclip | F=Fly")
+print("[XYINHUB] Systems: ESP, AutoKill, AutoSafe, SeekerDetector, Speed, Jump, Noclip, AutoCoin, TeleportHider")
+print("[XYINHUB] Hotkeys: RightAlt=Menu | Insert=ESP | Home=AutoKill | PageUp=TPHider | End=Coin | Delete=Speed | N=Noclip")
 print("[XYINHUB] @RukanooXD_YT")
 print("[XYINHUB] - .... . / .... .- -.-. -.- / .. ... / .-. . .- .-..")
 
 -- ============================================
--- END OF XYINHUB v8.1
+-- END OF XYINHUB v9.0
 -- ============================================
