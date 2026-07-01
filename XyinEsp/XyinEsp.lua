@@ -1,8 +1,8 @@
 -- ============================================
--- XYINHUB v8.0 - PAINT OR SEEK EDITION
+-- XYINHUB v8.1 - PAINT OR SEEK EDITION
 -- @RukanooXD_YT
--- Full Rebuild: Modern UI, Fixed Role Detection,
--- Instant AutoKill, Instant AutoCoin, No Delays
+-- Fixed: Syntax errors, Unicode corruption,
+-- Role detection delay, AutoKill, AutoCoin optimization
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -13,7 +13,6 @@ local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
-local TextService = game:GetService("TextService")
 
 -- ============================================
 -- DEVICE DETECTION
@@ -22,7 +21,7 @@ local IsMobile = UserInputService.TouchEnabled and not UserInputService.Keyboard
 local UIScale = IsMobile and 0.78 or 1
 
 -- ============================================
--- SETTINGS - NO DELAYS, INSTANT
+-- SETTINGS
 -- ============================================
 local Settings = {
     ESP = false,
@@ -45,7 +44,7 @@ local Settings = {
 }
 
 -- ============================================
--- GAME STATE - ENHANCED DETECTION
+-- GAME STATE
 -- ============================================
 local GameState = {
     InRound = false,
@@ -57,18 +56,15 @@ local function UpdateGameState()
     local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
     local inRound = false
     
-    -- Check PlayerGui for round indicators
     if playerGui then
         for _, gui in ipairs(playerGui:GetDescendants()) do
             if gui:IsA("TextLabel") or gui:IsA("TextButton") then
                 local text = gui.Text:lower()
-                -- Round active indicators
                 if text:match("round ends") or text:match("hiders left") or text:match("seekers left") 
                    or text:match("hiders:%s*%d+") or text:match("seekers:%s*%d+")
                    or text:match("time:") or text:match("timer:") then
                     inRound = true
                 end
-                -- Role detection from UI
                 if text:match("you:%s*seeker") or text:match("you%s*seeker") 
                    or text:match("role:%s*seeker") or text:match("team:%s*seeker")
                    or text:match("you are a seeker") or text:match("you are seeker") then
@@ -82,7 +78,6 @@ local function UpdateGameState()
         end
     end
     
-    -- Check workspace for round indicators
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("TextLabel") or obj:IsA("BillboardGui") then
             local txt = ""
@@ -95,14 +90,12 @@ local function UpdateGameState()
         end
     end
     
-    -- Check if in lobby (no round + lobby elements exist)
     local isLobby = false
     if not inRound then
         if Workspace:FindFirstChild("Lobby") or Workspace:FindFirstChild("Intermission")
            or Workspace:FindFirstChild("Waiting") or Workspace:FindFirstChild("Queue") then
             isLobby = true
         end
-        -- Check for spawn/lobby specific UI
         if playerGui then
             for _, gui in ipairs(playerGui:GetDescendants()) do
                 if gui:IsA("TextLabel") then
@@ -128,12 +121,23 @@ task.spawn(function()
 end)
 
 -- ============================================
--- ENHANCED ROLE DETECTION SYSTEM
+-- ENHANCED ROLE DETECTION
 -- ============================================
+local RoleCache = {}
+
 local function GetPlayerRole(p)
     if not p then return "Unknown" end
     
-    -- Method 1: PlayerGui text (most reliable)
+    -- Check cache first for non-localplayer (refresh every 2s)
+    if p ~= LocalPlayer and RoleCache[p] then
+        if tick() - RoleCache[p].time < 2 then
+            return RoleCache[p].role
+        end
+    end
+    
+    local role = "Unknown"
+    
+    -- Method 1: PlayerGui text
     local playerGui = p:FindFirstChild("PlayerGui")
     if playerGui then
         for _, gui in ipairs(playerGui:GetDescendants()) do
@@ -142,94 +146,120 @@ local function GetPlayerRole(p)
                 if text:match("you:%s*seeker") or text:match("you%s*seeker") 
                    or text:match("role:%s*seeker") or text:match("team:%s*seeker")
                    or text:match("you are a seeker") then
-                    return "Seeker"
+                    role = "Seeker"
+                    break
                 end
                 if text:match("you:%s*hider") or text:match("you%s*hider")
                    or text:match("role:%s*hider") or text:match("team:%s*hider")
                    or text:match("you are a hider") then
-                    return "Hider"
+                    role = "Hider"
+                    break
                 end
             end
         end
     end
     
-    -- Method 2: Character attributes/values/tags
-    local c = p.Character
-    if c then
-        -- Check for role indicator objects
-        if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") 
-           or c:FindFirstChild("SeekerTag") or c:FindFirstChild("SeekerRole") then
-            return "Seeker"
-        end
-        if c:FindFirstChild("Hider") or c:FindFirstChild("IsHider")
-           or c:FindFirstChild("HiderTag") or c:FindFirstChild("HiderRole") then
-            return "Hider"
-        end
-        
-        -- Check for attributes
-        local attrs = {"Role", "Team", "GameRole", "PlayerRole"}
-        for _, attr in ipairs(attrs) do
-            local val = c:GetAttribute(attr)
-            if val then
-                local v = tostring(val):lower()
-                if v:match("seeker") then return "Seeker" end
-                if v:match("hider") then return "Hider" end
+    -- Method 2: Character attributes/tags
+    if role == "Unknown" then
+        local c = p.Character
+        if c then
+            if c:FindFirstChild("Seeker") or c:FindFirstChild("IsSeeker") 
+               or c:FindFirstChild("SeekerTag") or c:FindFirstChild("SeekerRole") then
+                role = "Seeker"
+            elseif c:FindFirstChild("Hider") or c:FindFirstChild("IsHider")
+               or c:FindFirstChild("HiderTag") or c:FindFirstChild("HiderRole") then
+                role = "Hider"
             end
-        end
-        
-        -- Method 3: Tool-based detection (Seekers have weapons)
-        for _, tool in ipairs(c:GetChildren()) do
-            if tool:IsA("Tool") then
-                local tn = tool.Name:lower()
-                if tn:match("paint") or tn:match("brush") or tn:match("bucket") 
-                   or tn:match("seek") or tn:match("throw") or tn:match("knife")
-                   or tn:match("sword") or tn:match("weapon") or tn:match("gun")
-                   or tn:match("balloon") or tn:match("dart") then
-                    return "Seeker"
+            
+            if role == "Unknown" then
+                local attrs = {"Role", "Team", "GameRole", "PlayerRole"}
+                for _, attr in ipairs(attrs) do
+                    local val = c:GetAttribute(attr)
+                    if val then
+                        local v = tostring(val):lower()
+                        if v:match("seeker") then role = "Seeker" break end
+                        if v:match("hider") then role = "Hider" break end
+                    end
                 end
             end
-        end
-        
-        -- Method 4: BillboardGui/NameTag tags
-        for _, g in ipairs(c:GetDescendants()) do
-            if g:IsA("BillboardGui") or g:IsA("TextLabel") then
-                local txt = ""
-                pcall(function() txt = g.Text:lower() end)
-                if txt:match("seeker") and not txt:match("hider") then return "Seeker" end
-                if txt:match("hider") and not txt:match("seeker") then return "Hider" end
+            
+            -- Method 3: Tool-based
+            if role == "Unknown" then
+                for _, tool in ipairs(c:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        local tn = tool.Name:lower()
+                        if tn:match("paint") or tn:match("brush") or tn:match("bucket") 
+                           or tn:match("seek") or tn:match("throw") or tn:match("knife")
+                           or tn:match("sword") or tn:match("weapon") or tn:match("gun")
+                           or tn:match("balloon") or tn:match("dart") then
+                            role = "Seeker"
+                            break
+                        end
+                    end
+                end
             end
-        end
-    end
-    
-    -- Method 5: Backpack tool check
-    local bp = p:FindFirstChild("Backpack")
-    if bp then
-        for _, tool in ipairs(bp:GetChildren()) do
-            if tool:IsA("Tool") then
-                local tn = tool.Name:lower()
-                if tn:match("paint") or tn:match("brush") or tn:match("bucket")
-                   or tn:match("seek") or tn:match("throw") or tn:match("knife")
-                   or tn:match("sword") or tn:match("weapon") or tn:match("gun") then
-                    return "Seeker"
+            
+            -- Method 4: BillboardGui tags
+            if role == "Unknown" then
+                for _, g in ipairs(c:GetDescendants()) do
+                    if g:IsA("BillboardGui") or g:IsA("TextLabel") then
+                        local txt = ""
+                        pcall(function() txt = g.Text:lower() end)
+                        if txt:match("seeker") and not txt:match("hider") then role = "Seeker" break end
+                        if txt:match("hider") and not txt:match("seeker") then role = "Hider" break end
+                    end
                 end
             end
         end
     end
     
-    -- Method 6: Team-based inference
-    if p == LocalPlayer then
-        if GameState.MyRole ~= "Unknown" then
-            return GameState.MyRole
+    -- Method 5: Backpack tool
+    if role == "Unknown" then
+        local bp = p:FindFirstChild("Backpack")
+        if bp then
+            for _, tool in ipairs(bp:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local tn = tool.Name:lower()
+                    if tn:match("paint") or tn:match("brush") or tn:match("bucket")
+                       or tn:match("seek") or tn:match("throw") or tn:match("knife")
+                       or tn:match("sword") or tn:match("weapon") or tn:match("gun") then
+                        role = "Seeker"
+                        break
+                    end
+                end
+            end
         end
-    else
-        -- Infer from local player's role (opposite)
-        local myRole = GetPlayerRole(LocalPlayer)
-        if myRole == "Seeker" then return "Hider" end
-        if myRole == "Hider" then return "Seeker" end
     end
     
-    return "Unknown"
+    -- Method 6: Local inference
+    if role == "Unknown" then
+        if p == LocalPlayer then
+            if GameState.MyRole ~= "Unknown" then
+                role = GameState.MyRole
+            end
+        else
+            local myRole = GetPlayerRole(LocalPlayer)
+            if myRole == "Seeker" then role = "Hider"
+            elseif myRole == "Hider" then role = "Seeker" end
+        end
+    end
+    
+    -- Cache result
+    if p ~= LocalPlayer then
+        RoleCache[p] = {role = role, time = tick()}
+    end
+    
+    return role
 end
+
+-- Clear cache on character added
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        RoleCache[p] = nil
+        task.wait(0.5)
+        CreateESPObjects(p)
+    end)
+end)
 
 local function IsAlive(p)
     local c = p.Character
@@ -257,7 +287,7 @@ local function AmISeeker()
 end
 
 -- ============================================
--- DRAWING MANAGER - ESP
+-- DRAWING MANAGER
 -- ============================================
 local ESPObjects = {}
 
@@ -288,7 +318,7 @@ local function CreateESPObjects(p)
 end
 
 -- ============================================
--- ESP UPDATE - FIXED: NO LOBBY, REAL-TIME ROLE
+-- ESP UPDATE
 -- ============================================
 local function UpdateESP()
     if not Settings.ESP or not GameState.InRound then
@@ -305,7 +335,7 @@ local function UpdateESP()
         if p == LocalPlayer then continue end
         if not IsAlive(p) then
             if ESPObjects[p] then
-                for _, o in pairs(ESPObjects[p]) do pcall(function() o.Visible = false end) end
+                for _, o in pairs(ESPObjects[p]) do pcall(function() obj.Visible = false end) end
             end
             continue
         end
@@ -320,7 +350,7 @@ local function UpdateESP()
             local d = (hrp.Position - lHRP.Position).Magnitude
             if d > Settings.MaxDistance then
                 if ESPObjects[p] then
-                    for _, o in pairs(ESPObjects[p]) do pcall(function() o.Visible = false end) end
+                    for _, o in pairs(ESPObjects[p]) do pcall(function() obj.Visible = false end) end
                 end
                 continue
             end
@@ -329,7 +359,7 @@ local function UpdateESP()
         local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
         if not onScreen then
             if ESPObjects[p] then
-                for _, o in pairs(ESPObjects[p]) do pcall(function() o.Visible = false end) end
+                for _, o in pairs(ESPObjects[p]) do pcall(function() obj.Visible = false end) end
             end
             continue
         end
@@ -337,16 +367,15 @@ local function UpdateESP()
         if not ESPObjects[p] then CreateESPObjects(p) end
         local o = ESPObjects[p]
         
-        -- REAL-TIME ROLE DETECTION (not cached)
         local role = GetPlayerRole(p)
         local hp = hum.Health
         local maxHp = hum.MaxHealth
         
-        local color = Color3.fromRGB(0,255,255) -- cyan default
+        local color = Color3.fromRGB(0,255,255)
         if role == "Seeker" then 
-            color = Color3.fromRGB(255,50,50) -- red
+            color = Color3.fromRGB(255,50,50)
         elseif role == "Hider" then 
-            color = Color3.fromRGB(50,255,100) -- green
+            color = Color3.fromRGB(50,255,100)
         end
         
         local cf, size = c:GetBoundingBox()
@@ -410,7 +439,7 @@ local function UpdateESP()
 end
 
 -- ============================================
--- AUTO KILL - INSTANT THROW KILL, NO DELAY, BIG RADIUS
+-- AUTO KILL - FIXED: SPAM ACTIVATE + TOUCH
 -- ============================================
 local AutoKillConn = nil
 
@@ -463,23 +492,29 @@ local function StartAutoKill()
             local dist = (hrp.Position - lHRP.Position).Magnitude
             if dist > Settings.AutoKillRadius then continue end
             
-            -- INSTANT THROW KILL
+            -- SPAM KILL: Multiple activations + touch in single frame
             pcall(function()
                 local oldCFrame = lHRP.CFrame
                 
                 -- Face target
                 lHRP.CFrame = CFrame.new(lHRP.Position, hrp.Position)
                 
-                -- Activate tool (throw)
-                tool:Activate()
+                -- Spam activate 3x
+                for i = 1, 3 do
+                    tool:Activate()
+                end
                 
-                -- Move handle through target for guaranteed hit
+                -- Handle teleport + touch spam
                 if handle then
                     local oldHandleCF = handle.CFrame
                     
-                    -- Teleport handle to target multiple times for hit registration
-                    for i = 1, 3 do
-                        handle.CFrame = hrp.CFrame * CFrame.new(math.random(-1,1), math.random(-1,1), math.random(-1,1))
+                    for i = 1, 5 do
+                        handle.CFrame = hrp.CFrame * CFrame.new(
+                            math.random(-2, 2), 
+                            math.random(-2, 2), 
+                            math.random(-2, 2)
+                        )
+                        
                         firetouchinterest(handle, hrp, 0)
                         firetouchinterest(handle, hrp, 1)
                         
@@ -494,19 +529,20 @@ local function StartAutoKill()
                     handle.CFrame = oldHandleCF
                 end
                 
-                -- Body touch fallback
+                -- Body touch spam
                 for _, part in ipairs(lChar:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        firetouchinterest(part, hrp, 0)
-                        firetouchinterest(part, hrp, 1)
+                        for i = 1, 3 do
+                            firetouchinterest(part, hrp, 0)
+                            firetouchinterest(part, hrp, 1)
+                        end
                     end
                 end
                 
-                -- Return immediately
+                -- Instant return
                 lHRP.CFrame = oldCFrame
             end)
         end
-        -- NO DELAY - instant loop
     end)
 end
 
@@ -857,18 +893,20 @@ local function StartTP()
                 
                 if hrp and lHRP then
                     lHRP.CFrame = hrp.CFrame * CFrame.new(0, 0, 3)
-                    break -- teleport to first hider found
+                    break
                 end
             end
-            task.wait(Settings.TeleportHider and 0.1 or 0.5)
+            task.wait(0.1)
         end
     end)
 end
 
 -- ============================================
--- AUTO COIN - INSTANT, DIRECT, NO BYPASS, ACCURATE
+-- AUTO COIN - OPTIMIZED WITH CACHE
 -- ============================================
 local CoinConn = nil
+local CachedCoins = {}
+local LastCoinUpdate = 0
 
 local function IsCoin(obj)
     if not obj or not obj.Parent then return false end
@@ -877,7 +915,6 @@ local function IsCoin(obj)
     local n = obj.Name:lower()
     local isCoinName = false
     
-    -- Positive matches
     if n:match("coin") or n:match("money") or n:match("gold") or n:match("cash")
        or n:match("gem") or n:match("token") or n:match("collectible") or n:match("point")
        or n:match("star") or n:match("reward") or n:match("drop") or n:match("pickup")
@@ -888,7 +925,6 @@ local function IsCoin(obj)
     
     if not isCoinName then return false end
     
-    -- Negative matches (blacklist)
     local blacklist = {"invite", "friend", "gui", "button", "frame", "label", "menu", "shop",
         "settings", "inventory", "taunt", "pose", "lock", "paint", "troll", "become",
         "tiny", "giant", "portal", "spawn", "lobby", "home", "base", "checkpoint",
@@ -899,12 +935,10 @@ local function IsCoin(obj)
         if n:match(bl) then return false end
     end
     
-    -- Must have interaction capability
     local hasTouch = obj:FindFirstChildWhichIsA("TouchInterest") ~= nil
     local hasPrompt = obj:FindFirstChildWhichIsA("ProximityPrompt") ~= nil
     local hasClick = obj:FindFirstChildWhichIsA("ClickDetector") ~= nil
     
-    -- Also check parent for prompt
     if not hasPrompt then
         hasPrompt = obj.Parent and obj.Parent:FindFirstChildWhichIsA("ProximityPrompt") ~= nil
     end
@@ -912,41 +946,31 @@ local function IsCoin(obj)
     return hasTouch or hasPrompt or hasClick
 end
 
-local function FindCoins()
-    local coins = {}
-    local lChar = LocalPlayer.Character
-    local lHRP = lChar and GetHRP(LocalPlayer)
-    if not lHRP then return coins end
-    
-    -- Method 1: Scan workspace descendants
+local function UpdateCoinCache()
+    CachedCoins = {}
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if IsCoin(obj) then
-            table.insert(coins, obj)
+            table.insert(CachedCoins, obj)
         end
     end
-    
-    -- Method 2: Check common coin containers
-    local coinContainers = {"Coins", "CoinSpawns", "Drops", "Loot", "Collectibles", 
-        "Rewards", "Items", "Pickups", "Spawns", "Map", "Game"}
-    for _, name in ipairs(coinContainers) do
-        local container = Workspace:FindFirstChild(name)
-        if container then
-            for _, obj in ipairs(container:GetDescendants()) do
-                if IsCoin(obj) then
-                    local found = false
-                    for _, c in ipairs(coins) do
-                        if c == obj then found = true break end
-                    end
-                    if not found then
-                        table.insert(coins, obj)
-                    end
-                end
-            end
-        end
-    end
-    
-    return coins
+    LastCoinUpdate = tick()
 end
+
+-- Event-based coin tracking
+Workspace.DescendantAdded:Connect(function(obj)
+    if IsCoin(obj) then
+        table.insert(CachedCoins, obj)
+    end
+end)
+
+Workspace.DescendantRemoving:Connect(function(obj)
+    for i, coin in ipairs(CachedCoins) do
+        if coin == obj then
+            table.remove(CachedCoins, i)
+            break
+        end
+    end
+end)
 
 local function StartCoin()
     if CoinConn then return end
@@ -957,12 +981,16 @@ local function StartCoin()
                 continue
             end
             
-            local coins = FindCoins()
+            -- Refresh cache every 5 seconds
+            if tick() - LastCoinUpdate > 5 then
+                UpdateCoinCache()
+            end
+            
             local lChar = LocalPlayer.Character
             local lHRP = lChar and GetHRP(LocalPlayer)
             
             if lHRP then
-                for _, coin in ipairs(coins) do
+                for _, coin in ipairs(CachedCoins) do
                     if not Settings.AutoCoin then break end
                     if not coin or not coin.Parent then continue end
                     
@@ -970,11 +998,8 @@ local function StartCoin()
                     if dist < 400 then
                         pcall(function()
                             local oldPos = lHRP.CFrame
-                            
-                            -- INSTANT teleport to coin
                             lHRP.CFrame = coin.CFrame * CFrame.new(0, 2, 0)
                             
-                            -- Touch with all parts
                             firetouchinterest(lHRP, coin, 0)
                             firetouchinterest(lHRP, coin, 1)
                             
@@ -985,7 +1010,6 @@ local function StartCoin()
                                 end
                             end
                             
-                            -- Prompt
                             local prompt = coin:FindFirstChildWhichIsA("ProximityPrompt")
                             if not prompt and coin.Parent then
                                 prompt = coin.Parent:FindFirstChildWhichIsA("ProximityPrompt")
@@ -994,13 +1018,11 @@ local function StartCoin()
                                 fireproximityprompt(prompt)
                             end
                             
-                            -- Click detector
                             local clicker = coin:FindFirstChildWhichIsA("ClickDetector")
                             if clicker then
                                 fireclickdetector(clicker)
                             end
                             
-                            -- INSTANT return
                             lHRP.CFrame = oldPos
                         end)
                     end
@@ -1014,15 +1036,9 @@ end
 -- ============================================
 -- PLAYER EVENTS
 -- ============================================
-Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        CreateESPObjects(p)
-    end)
-end)
-
 Players.PlayerRemoving:Connect(function(p)
     RemoveESP(p)
+    RoleCache[p] = nil
 end)
 
 for _, p in ipairs(Players:GetPlayers()) do
@@ -1044,25 +1060,25 @@ StartTP()
 StartCoin()
 
 -- ============================================
--- MODERN UI - FLUXUS/ARCEUS X STYLE
+-- MODERN UI - FIXED UNICODE & SYNTAX
 -- ============================================
-local SG = Instance.new("ScreenGui")
-SG.Name = "XyinHub_" .. tostring(math.random(10000, 99999))
-SG.Parent = CoreGui
-SG.ResetOnSpawn = false
-SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+local SG_UI = Instance.new("ScreenGui")
+SG_UI.Name = "XyinHub_" .. tostring(math.random(10000, 99999))
+SG_UI.Parent = CoreGui
+SG_UI.ResetOnSpawn = false
+SG_UI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 -- Watermark
 local Watermark = Instance.new("TextLabel")
 Watermark.Size = UDim2.new(0, 250, 0, 20)
 Watermark.Position = UDim2.new(1, -260, 0, 10)
 Watermark.BackgroundTransparency = 1
-Watermark.Text = "@RukanooXD_YT | XYINHUB v8.0"
+Watermark.Text = "@RukanooXD_YT | XYINHUB v8.1"
 Watermark.TextColor3 = Color3.fromRGB(0, 255, 255)
 Watermark.TextSize = 11
 Watermark.Font = Enum.Font.GothamBold
 Watermark.TextTransparency = 0.4
-Watermark.Parent = SG
+Watermark.Parent = SG_UI
 
 -- Loading Screen
 local Loading = Instance.new("Frame")
@@ -1070,7 +1086,7 @@ Loading.Size = UDim2.new(1, 0, 1, 0)
 Loading.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
 Loading.BorderSizePixel = 0
 Loading.ZIndex = 9999
-Loading.Parent = SG
+Loading.Parent = SG_UI
 
 local LoadGradient = Instance.new("UIGradient")
 LoadGradient.Color = ColorSequence.new({
@@ -1081,7 +1097,6 @@ LoadGradient.Color = ColorSequence.new({
 LoadGradient.Rotation = 45
 LoadGradient.Parent = Loading
 
--- Animated particles
 for i = 1, 20 do
     local p = Instance.new("Frame")
     p.Size = UDim2.new(0, math.random(3, 6), 0, math.random(3, 6))
@@ -1119,7 +1134,7 @@ local SubText = Instance.new("TextLabel")
 SubText.Size = UDim2.new(0, 500, 0, 24 * UIScale)
 SubText.Position = UDim2.new(0.5, -250, 0.38, 0)
 SubText.BackgroundTransparency = 1
-SubText.Text = "Paint or Seek Edition | v8.0"
+SubText.Text = "Paint or Seek Edition | v8.1"
 SubText.TextColor3 = Color3.fromRGB(100, 200, 255)
 SubText.TextSize = 14 * UIScale
 SubText.Font = Enum.Font.GothamBold
@@ -1137,7 +1152,6 @@ RoleText.Font = Enum.Font.Gotham
 RoleText.ZIndex = 10001
 RoleText.Parent = Loading
 
--- Update role text
 task.spawn(function()
     while Loading.Parent do
         local role = GetPlayerRole(LocalPlayer)
@@ -1214,7 +1228,7 @@ task.spawn(function()
 end)
 
 -- ============================================
--- MAIN MENU - MODERN DARK GLASS
+-- MAIN MENU
 -- ============================================
 local MenuSize = IsMobile and UDim2.new(0, 320, 0, 420) or UDim2.new(0, 420, 0, 560)
 local Main = Instance.new("Frame")
@@ -1227,7 +1241,7 @@ Main.BorderSizePixel = 0
 Main.Visible = false
 Main.Active = true
 Main.ClipsDescendants = true
-Main.Parent = SG
+Main.Parent = SG_UI
 
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 16)
 
@@ -1246,7 +1260,6 @@ MainGradient.Color = ColorSequence.new({
 MainGradient.Rotation = 135
 MainGradient.Parent = Main
 
--- Shadow
 local Shadow = Instance.new("ImageLabel")
 Shadow.Size = UDim2.new(1, 80, 1, 80)
 Shadow.Position = UDim2.new(0, -40, 0, -40)
@@ -1278,7 +1291,7 @@ local TitleIcon = Instance.new("TextLabel")
 TitleIcon.Size = UDim2.new(0, 30, 0, 30)
 TitleIcon.Position = UDim2.new(0, 14, 0, 13)
 TitleIcon.BackgroundTransparency = 1
-TitleIcon.Text = "◈"
+TitleIcon.Text = "X"
 TitleIcon.TextColor3 = Color3.fromRGB(0, 255, 255)
 TitleIcon.TextSize = 22
 TitleIcon.Font = Enum.Font.GothamBlack
@@ -1299,7 +1312,7 @@ local TitleSub = Instance.new("TextLabel")
 TitleSub.Size = UDim2.new(0, 200, 0, 16 * UIScale)
 TitleSub.Position = UDim2.new(0, 48, 0, 30)
 TitleSub.BackgroundTransparency = 1
-TitleSub.Text = "Paint or Seek | v8.0"
+TitleSub.Text = "Paint or Seek | v8.1"
 TitleSub.TextColor3 = Color3.fromRGB(100, 150, 200)
 TitleSub.TextSize = 9 * UIScale
 TitleSub.Font = Enum.Font.GothamBold
@@ -1318,19 +1331,21 @@ RoleDisplay.Font = Enum.Font.GothamBold
 RoleDisplay.Parent = TitleBar
 Instance.new("UICorner", RoleDisplay).CornerRadius = UDim.new(0, 6)
 
--- Update role display
 task.spawn(function()
     while RoleDisplay.Parent do
         local role = GetPlayerRole(LocalPlayer)
         RoleDisplay.Text = "You: " .. role
         if role == "Seeker" then
             RoleDisplay.TextColor3 = Color3.fromRGB(255, 80, 80)
+            RoleDisplay.BackgroundColor3 = Color3.fromRGB(40, 15, 15)
         elseif role == "Hider" then
             RoleDisplay.TextColor3 = Color3.fromRGB(80, 255, 100)
+            RoleDisplay.BackgroundColor3 = Color3.fromRGB(15, 40, 20)
         else
             RoleDisplay.TextColor3 = Color3.fromRGB(0, 255, 255)
+            RoleDisplay.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
         end
-        task.wait(0.5)
+        task.wait(0.3)
     end
 end)
 
@@ -1339,7 +1354,7 @@ local MinBtn = Instance.new("TextButton")
 MinBtn.Size = UDim2.new(0, 28, 0, 28)
 MinBtn.Position = UDim2.new(1, -66, 0, 14)
 MinBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-MinBtn.Text = "−"
+MinBtn.Text = "-"
 MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinBtn.TextSize = 18
 MinBtn.Font = Enum.Font.GothamBold
@@ -1350,7 +1365,7 @@ local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 28, 0, 28)
 CloseBtn.Position = UDim2.new(1, -34, 0, 14)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-CloseBtn.Text = "×"
+CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.TextSize = 18
 CloseBtn.Font = Enum.Font.GothamBold
@@ -1418,10 +1433,10 @@ local function MakeTab(name, icon)
     return content
 end
 
-local ESPContent = MakeTab("ESP", "◉")
-local CombatContent = MakeTab("Combat", "⚔")
-local MiscContent = MakeTab("Misc", "◆")
-local PlayerContent = MakeTab("Player", "▲")
+local ESPContent = MakeTab("ESP", "[O]")
+local CombatContent = MakeTab("Combat", "[/]")
+local MiscContent = MakeTab("Misc", "[*]")
+local PlayerContent = MakeTab("Player", "[^]")
 
 Tabs[1].BackgroundColor3 = Color3.fromRGB(0, 200, 255)
 Tabs[1].TextColor3 = Color3.fromRGB(0, 0, 0)
@@ -1462,7 +1477,6 @@ local function MakeToggle(parent, text, key, desc)
         d.Parent = f
     end
     
-    -- Modern toggle
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(0, 48, 0, 24)
     bg.Position = UDim2.new(1, -60, 0.5, -12)
@@ -1667,7 +1681,7 @@ MenuBtn.Text = "X"
 MenuBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
 MenuBtn.TextSize = 20 * UIScale
 MenuBtn.Font = Enum.Font.GothamBlack
-MenuBtn.Parent = SG
+MenuBtn.Parent = SG_UI
 
 Instance.new("UICorner", MenuBtn).CornerRadius = UDim.new(0, 14)
 
@@ -1676,11 +1690,7 @@ BtnStroke.Color = Color3.fromRGB(0, 200, 255)
 BtnStroke.Thickness = 2
 BtnStroke.Parent = MenuBtn
 
-local -- ============================================
--- PART 2 CONTINUED - UI MODERN (LANJUTAN)
--- ============================================
-
--- BtnGlow animation (lanjutan dari terputus)
+-- FIXED: No broken 'local' here, direct continuation
 local BtnGlow = Instance.new("ImageLabel")
 BtnGlow.Size = UDim2.new(1.5, 0, 1.5, 0)
 BtnGlow.Position = UDim2.new(-0.25, 0, -0.25, 0)
@@ -1693,6 +1703,7 @@ BtnGlow.Parent = MenuBtn
 task.spawn(function()
     while MenuBtn.Parent do
         TweenService:Create(BtnGlow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.3}):Play()
+       
         task.wait(1.2)
         TweenService:Create(BtnGlow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = 0.7}):Play()
         task.wait(1.2)
@@ -1732,7 +1743,6 @@ end)
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     
-    -- Toggle menu: RightAlt
     if input.KeyCode == Enum.KeyCode.RightAlt then
         Main.Visible = not Main.Visible
         if Main.Visible then
@@ -1744,7 +1754,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         end
     end
     
-    -- Hotkeys
     if input.KeyCode == Enum.KeyCode.Insert then
         Settings.ESP = not Settings.ESP
     end
@@ -1814,7 +1823,7 @@ NotifFrame.Size = UDim2.new(0, 360 * UIScale, 0, 80 * UIScale)
 NotifFrame.Position = UDim2.new(1, 20, 1, 20)
 NotifFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 22)
 NotifFrame.BorderSizePixel = 0
-NotifFrame.Parent = SG
+NotifFrame.Parent = SG_UI
 Instance.new("UICorner", NotifFrame).CornerRadius = UDim.new(0, 14)
 
 local NotifStroke = Instance.new("UIStroke")
@@ -1835,7 +1844,7 @@ local NotifTitle = Instance.new("TextLabel")
 NotifTitle.Size = UDim2.new(1, -24, 0, 24 * UIScale)
 NotifTitle.Position = UDim2.new(0, 14, 0, 8)
 NotifTitle.BackgroundTransparency = 1
-NotifTitle.Text = "XYINHUB v8.0 LOADED"
+NotifTitle.Text = "XYINHUB v8.1 LOADED"
 NotifTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
 NotifTitle.TextSize = 14 * UIScale
 NotifTitle.Font = Enum.Font.GothamBlack
@@ -1851,7 +1860,6 @@ NotifRole.TextSize = 10 * UIScale
 NotifRole.Font = Enum.Font.GothamBold
 NotifRole.Parent = NotifFrame
 
--- Update role in notification
 task.spawn(function()
     while NotifRole.Parent do
         local role = GetPlayerRole(LocalPlayer)
@@ -1877,10 +1885,8 @@ NotifVer.TextSize = 9 * UIScale
 NotifVer.Font = Enum.Font.Gotham
 NotifVer.Parent = NotifFrame
 
--- Animate notification in
 NotifFrame:TweenPosition(UDim2.new(1, -380 * UIScale, 1, -90 * UIScale), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.5)
 
--- Auto dismiss
 task.delay(10, function()
     NotifFrame:TweenPosition(UDim2.new(1, 20, 1, 20), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.4)
     task.wait(0.5)
@@ -1888,32 +1894,9 @@ task.delay(10, function()
 end)
 
 -- ============================================
--- REAL-TIME ROLE DISPLAY IN MENU
--- ============================================
-task.spawn(function()
-    while TitleBar and TitleBar.Parent do
-        local role = GetPlayerRole(LocalPlayer)
-        if RoleDisplay and RoleDisplay.Parent then
-            RoleDisplay.Text = "You: " .. role
-            if role == "Seeker" then
-                RoleDisplay.TextColor3 = Color3.fromRGB(255, 80, 80)
-                RoleDisplay.BackgroundColor3 = Color3.fromRGB(40, 15, 15)
-            elseif role == "Hider" then
-                RoleDisplay.TextColor3 = Color3.fromRGB(80, 255, 100)
-                RoleDisplay.BackgroundColor3 = Color3.fromRGB(15, 40, 20)
-            else
-                RoleDisplay.TextColor3 = Color3.fromRGB(0, 255, 255)
-                RoleDisplay.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
-            end
-        end
-        task.wait(0.3)
-    end
-end)
-
--- ============================================
 -- CLEANUP ON DESTROY
 -- ============================================
-SG.Destroying:Connect(function()
+SG_UI.Destroying:Connect(function()
     for _, o in pairs(ESPObjects) do
         for _, obj in pairs(o) do pcall(function() obj:Remove() end) end
     end
@@ -1933,7 +1916,7 @@ end)
 -- ============================================
 -- FINAL PRINT
 -- ============================================
-print("[XYINHUB] v8.0 Paint or Seek Edition LOADED")
+print("[XYINHUB] v8.1 Paint or Seek Edition LOADED")
 print("[XYINHUB] User: " .. LocalPlayer.Name .. " | ID: " .. LocalPlayer.UserId)
 print("[XYINHUB] Role: " .. GetPlayerRole(LocalPlayer))
 print("[XYINHUB] Device: " .. (IsMobile and "Mobile" or "PC"))
@@ -1943,5 +1926,5 @@ print("[XYINHUB] @RukanooXD_YT")
 print("[XYINHUB] - .... . / .... .- -.-. -.- / .. ... / .-. . .- .-..")
 
 -- ============================================
--- END OF XYINHUB v8.0
+-- END OF XYINHUB v8.1
 -- ============================================
