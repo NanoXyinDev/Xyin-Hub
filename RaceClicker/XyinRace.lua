@@ -1,23 +1,9 @@
 -- ============================================================
--- RACE CLICKER - ULTIMATE CHEAT v3.0
+-- RACE CLICKER - ULTIMATE CHEAT v4.0
 -- Developer: @XyrooXellz
+-- Style: Micro Black & White Root Terminal
 -- Game: Race Clicker (by 48h Games) | ID: 9285238704
 -- Executor: Synapse X / KRNL / Fluxus / Script-Ware / Delta / Hydrogen
--- ============================================================
--- FITUR:
--- 1. Auto Clicker (Auto Stop saat race mulai)
--- 2. Speed Hack (Max 999B)
--- 3. Auto Race (Auto masuk race + auto finish)
--- 4. Auto Farm Wins
--- 5. Auto Rebirth
--- 6. Auto Hatch Eggs
--- 7. Auto Equip Best Pets
--- 8. Auto Redeem Codes
--- 9. Anti-Fall / Auto Steer
--- 10. Teleport to Best World
--- 11. WalkSpeed & JumpPower
--- 12. Modern UI @XyrooXellz Style
--- 13. Progress Loading Animation
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -29,6 +15,7 @@ local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
 local StarterGui = game:GetService("StarterGui")
+local TextService = game:GetService("TextService")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -39,31 +26,40 @@ local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 -- KONFIGURASI
 -- ============================================================
 local Config = {
-    AutoClick = false,
-    ClickSpeed = 0.001,
+    -- Race Menu
     AutoRace = false,
     SpeedHack = false,
-    SpeedValue = 999000000000, -- 999B
+    SpeedValue = 999000000000,
+    AutoClick = false,
+    ClickSpeed = 0.001,
+
+    -- Misc Menu
     AutoFarm = false,
     AutoRebirth = false,
     AutoHatch = false,
     AutoEquipBestPets = false,
     AutoRedeemCodes = false,
     AntiFall = false,
+    AutoSteer = false,
     WalkSpeed = 100,
     JumpPower = 150,
-    AutoSteer = false,
     TeleportToBestWorld = false,
+
+    -- Profile Menu
+    ShowStats = false,
 }
 
 -- ============================================================
--- DETEKSI GAME STATE (Race Phase vs Click Phase)
+-- GAME STATE DETECTION
 -- ============================================================
 local GameState = {
     IsRaceActive = false,
     IsClickPhase = false,
     Countdown = 0,
     CurrentWorld = 1,
+    Wins = 0,
+    Rebirths = 0,
+    Speed = 0,
 }
 
 -- Cari Remote Events
@@ -92,7 +88,7 @@ local function FindRemotes()
 end
 FindRemotes()
 
--- Backup: Cari di workspace juga
+-- Backup workspace
 if not Remotes.Click then
     for _, v in pairs(workspace:GetDescendants()) do
         if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
@@ -104,33 +100,46 @@ if not Remotes.Click then
     end
 end
 
--- Deteksi Game State dari UI
+-- Update Game State
 local function UpdateGameState()
     for _, v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
         if v:IsA("TextLabel") then
             local text = v.Text:lower()
-            if text:find("race starting") or text:find("get ready") or text:find("click!") then
+            if text:find("race starting") or text:find("get ready") or text:find("click!") or text:find("countdown") then
                 GameState.IsClickPhase = true
                 GameState.IsRaceActive = false
-            elseif text:find("race in progress") or text:find("racing") then
+            elseif text:find("race in progress") or text:find("racing") or text:find("go!") then
                 GameState.IsClickPhase = false
                 GameState.IsRaceActive = true
-            elseif text:find("finished") or text:find("results") then
+            elseif text:find("finished") or text:find("results") or text:find("winner") then
                 GameState.IsClickPhase = false
                 GameState.IsRaceActive = false
             end
 
-            -- Deteksi countdown
             local num = text:match("(%d+)")
             if num then
                 GameState.Countdown = tonumber(num)
             end
         end
     end
+
+    -- Update stats
+    for _, v in pairs(LocalPlayer:GetDescendants()) do
+        if v:IsA("IntValue") or v:IsA("NumberValue") then
+            local name = v.Name:lower()
+            if name:find("win") then
+                GameState.Wins = v.Value
+            elseif name:find("rebirth") then
+                GameState.Rebirths = v.Value
+            elseif name:find("speed") or name:find("strength") then
+                GameState.Speed = v.Value
+            end
+        end
+    end
 end
 
 -- ============================================================
--- UTILITY FUNCTIONS
+-- UTILITY
 -- ============================================================
 local function Notify(title, text, duration)
     duration = duration or 3
@@ -158,16 +167,12 @@ local function GetHRP()
 end
 
 -- ============================================================
--- SPEED HACK (999B)
+-- RACE ENGINE (Merged: Auto Win + Auto Race + Speed Hack)
 -- ============================================================
--- Cara 1: Modify Humanoid WalkSpeed
--- Cara 2: Modify Velocity langsung
--- Cara 3: Fire Remote dengan speed value tinggi
--- Cara 4: Modify BodyVelocity
--- Cara 5: CFrame teleport forward
--- Cara 6: Modify game values (Wins/Speed stats)
-
-local SpeedConnections = {}
+local RaceEngine = {
+    Connection = nil,
+    SpeedBodyVelocity = nil,
+}
 
 local function ApplySpeedHack()
     if not Config.SpeedHack then return end
@@ -175,38 +180,40 @@ local function ApplySpeedHack()
     local hrp = GetHRP()
     local humanoid = GetHumanoid()
 
-    -- Cara 1: WalkSpeed
+    -- Method 1: WalkSpeed
     humanoid.WalkSpeed = 999
 
-    -- Cara 2: Velocity manipulation
+    -- Method 2: Velocity
     pcall(function()
         hrp.Velocity = hrp.CFrame.LookVector * Config.SpeedValue
     end)
 
-    -- Cara 3: Fire remote dengan speed tinggi
+    -- Method 3: Remote
     if Remotes.Click then
         pcall(function()
             Remotes.Click:FireServer(Config.SpeedValue)
         end)
     end
 
-    -- Cara 4: BodyVelocity
+    -- Method 4: BodyVelocity
     pcall(function()
-        local bv = hrp:FindFirstChild("SpeedHackBV") or Instance.new("BodyVelocity")
-        bv.Name = "SpeedHackBV"
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bv.Velocity = hrp.CFrame.LookVector * Config.SpeedValue
-        bv.Parent = hrp
+        if not RaceEngine.SpeedBodyVelocity or not RaceEngine.SpeedBodyVelocity.Parent then
+            RaceEngine.SpeedBodyVelocity = Instance.new("BodyVelocity")
+            RaceEngine.SpeedBodyVelocity.Name = "XyrooXellz_Speed"
+            RaceEngine.SpeedBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            RaceEngine.SpeedBodyVelocity.Parent = hrp
+        end
+        RaceEngine.SpeedBodyVelocity.Velocity = hrp.CFrame.LookVector * Config.SpeedValue
     end)
 
-    -- Cara 5: CFrame teleport forward (instant movement)
+    -- Method 5: CFrame teleport
     pcall(function()
         if GameState.IsRaceActive then
             hrp.CFrame = hrp.CFrame + (hrp.CFrame.LookVector * 50)
         end
     end)
 
-    -- Cara 6: Modify player stats
+    -- Method 6: Stats modify
     pcall(function()
         for _, v in pairs(LocalPlayer:GetDescendants()) do
             if v:IsA("IntValue") or v:IsA("NumberValue") then
@@ -219,138 +226,67 @@ local function ApplySpeedHack()
     end)
 end
 
-local function StartSpeedHack()
-    if SpeedConnections.Hack then return end
-
-    Notify("Race Clicker", "Speed Hack 999B ACTIVATED! 🔥")
-
-    SpeedConnections.Hack = RunService.Heartbeat:Connect(function()
-        ApplySpeedHack()
-    end)
-end
-
-local function StopSpeedHack()
-    if SpeedConnections.Hack then
-        SpeedConnections.Hack:Disconnect()
-        SpeedConnections.Hack = nil
-    end
-
-    -- Cleanup BodyVelocity
+local function CleanupSpeedHack()
     pcall(function()
         local hrp = GetHRP()
-        local bv = hrp:FindFirstChild("SpeedHackBV")
+        local bv = hrp:FindFirstChild("XyrooXellz_Speed")
         if bv then bv:Destroy() end
+        RaceEngine.SpeedBodyVelocity = nil
     end)
-
-    -- Reset WalkSpeed
     pcall(function()
         GetHumanoid().WalkSpeed = 16
     end)
 end
 
--- ============================================================
--- AUTO CLICKER (Auto Stop saat race mulai)
--- ============================================================
-local ClickConnection
-local function StartAutoClick()
-    if ClickConnection then return end
+local function StartRaceEngine()
+    if RaceEngine.Connection then return end
 
-    Notify("Race Clicker", "Auto Clicker ACTIVATED! (Auto-stop saat race)")
+    Notify("🏁 Race Engine", "Activated! Auto Win + Speed Hack + Auto Click")
 
-    ClickConnection = RunService.Heartbeat:Connect(function()
-        if not Config.AutoClick then return end
-
-        -- Update game state
+    RaceEngine.Connection = RunService.Heartbeat:Connect(function()
         UpdateGameState()
 
-        -- AUTO STOP saat race mulai
-        if GameState.IsRaceActive then
-            return -- Stop clicking, race udah mulai
-        end
-
-        -- Hanya click saat click phase
+        -- PHASE 1: CLICK PHASE (0-30 detik)
         if GameState.IsClickPhase or GameState.Countdown > 0 then
-            -- Method 1: Fire Remote
-            if Remotes.Click then
-                pcall(function()
-                    Remotes.Click:FireServer()
-                end)
-            end
-
-            -- Method 2: Simulate Mouse Click
-            pcall(function()
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                task.wait(Config.ClickSpeed)
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-            end)
-
-            -- Method 3: Fire ClickDetector
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("ClickDetector") then
+            -- Auto Clicker
+            if Config.AutoClick then
+                for i = 1, 10 do
+                    if Remotes.Click then
+                        pcall(function()
+                            Remotes.Click:FireServer()
+                        end)
+                    end
                     pcall(function()
-                        fireclickdetector(v)
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
                     end)
-                end
-            end
-
-            -- Method 4: Fire ProximityPrompt
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("ProximityPrompt") then
-                    pcall(function()
-                        fireproximityprompt(v)
-                    end)
-                end
-            end
-        end
-    end)
-end
-
-local function StopAutoClick()
-    if ClickConnection then
-        ClickConnection:Disconnect()
-        ClickConnection = nil
-    end
-end
-
--- ============================================================
--- AUTO RACE (Auto masuk race + auto finish)
--- ============================================================
-local RaceConnection
-local function StartAutoRace()
-    if RaceConnection then return end
-
-    Notify("Race Clicker", "Auto Race ACTIVATED! 🏁")
-
-    RaceConnection = RunService.Heartbeat:Connect(function()
-        if not Config.AutoRace then return end
-
-        UpdateGameState()
-        local hrp = GetHRP()
-        local humanoid = GetHumanoid()
-
-        -- Phase 1: Click Phase - Auto click maksimal
-        if GameState.IsClickPhase then
-            -- Click secepat mungkin
-            for i = 1, 10 do
-                if Remotes.Click then
-                    pcall(function()
-                        Remotes.Click:FireServer()
-                    end)
+                    for _, v in pairs(workspace:GetDescendants()) do
+                        if v:IsA("ClickDetector") then
+                            pcall(function() fireclickdetector(v) end)
+                        end
+                        if v:IsA("ProximityPrompt") then
+                            pcall(function() fireproximityprompt(v) end)
+                        end
+                    end
                 end
             end
         end
 
-        -- Phase 2: Race Phase - Auto run + speed hack
+        -- PHASE 2: RACE PHASE (Auto Win)
         if GameState.IsRaceActive then
-            -- Speed hack aktif
+            local hrp = GetHRP()
+            local humanoid = GetHumanoid()
+
+            -- Speed Hack
             ApplySpeedHack()
 
-            -- Auto run forward
+            -- Auto run
             humanoid:Move(Vector3.new(0, 0, -1))
 
-            -- Teleport ke finish line
+            -- Teleport ke finish (instant win)
             for _, v in pairs(workspace:GetDescendants()) do
-                if v.Name:lower():find("finish") or v.Name:lower():find("end") or v.Name:lower():find("goal") then
+                local name = v.Name:lower()
+                if name:find("finish") or name:find("end") or name:find("goal") or name:find("win") then
                     if v:IsA("BasePart") or v:IsA("MeshPart") then
                         pcall(function()
                             hrp.CFrame = v.CFrame + Vector3.new(0, 5, 0)
@@ -360,7 +296,7 @@ local function StartAutoRace()
                 end
             end
 
-            -- Cari checkpoint dan teleport
+            -- Teleport ke checkpoint
             for _, v in pairs(workspace:GetDescendants()) do
                 if v.Name:lower():find("checkpoint") then
                     if v:IsA("BasePart") or v:IsA("MeshPart") then
@@ -370,15 +306,19 @@ local function StartAutoRace()
                     end
                 end
             end
+
+            -- CFrame rush forward
+            pcall(function()
+                hrp.CFrame = hrp.CFrame + (hrp.CFrame.LookVector * 100)
+            end)
         end
 
-        -- Phase 3: Results Phase - Auto restart
+        -- PHASE 3: RESULTS (Auto restart)
         if not GameState.IsRaceActive and not GameState.IsClickPhase then
-            -- Cari tombol restart/next race
             for _, v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
                 if v:IsA("TextButton") or v:IsA("ImageButton") then
                     local name = v.Name:lower()
-                    if name:find("race") or name:find("start") or name:find("next") or name:find("play") then
+                    if name:find("race") or name:find("start") or name:find("next") or name:find("play") or name:find("restart") then
                         pcall(function()
                             v.MouseButton1Click:Fire()
                         end)
@@ -386,63 +326,84 @@ local function StartAutoRace()
                 end
             end
 
-            -- Fire race remote
             if Remotes.Race then
                 pcall(function()
                     Remotes.Race:FireServer("Start")
                 end)
             end
         end
-    end)
-end
 
-local function StopAutoRace()
-    if RaceConnection then
-        RaceConnection:Disconnect()
-        RaceConnection = nil
-    end
-end
-
--- ============================================================
--- AUTO FARM WINS
--- ============================================================
-local FarmConnection
-local function StartAutoFarm()
-    if FarmConnection then return end
-
-    Notify("Race Clicker", "Auto Farm ACTIVATED!")
-
-    FarmConnection = RunService.Heartbeat:Connect(function()
-        if not Config.AutoFarm then return end
-
-        local hrp = GetHRP()
-        local humanoid = GetHumanoid()
-
-        UpdateGameState()
-
-        -- Click phase: click maksimal
-        if GameState.IsClickPhase then
-            for i = 1, 5 do
-                if Remotes.Click then
-                    pcall(function()
-                        Remotes.Click:FireServer()
-                    end)
+        -- Anti Fall
+        if Config.AntiFall then
+            local hrp = GetHRP()
+            if hrp.Position.Y < -50 then
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v.Name:lower():find("spawn") or v.Name:lower():find("start") then
+                        if v:IsA("BasePart") or v:IsA("MeshPart") then
+                            hrp.CFrame = v.CFrame + Vector3.new(0, 5, 0)
+                            break
+                        end
+                    end
                 end
             end
         end
 
-        -- Race phase: auto run + teleport
+        -- Auto Steer
+        if Config.AutoSteer then
+            local hrp = GetHRP()
+            local humanoid = GetHumanoid()
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v.Name:lower():find("track") or v.Name:lower():find("path") then
+                    if v:IsA("BasePart") or v:IsA("MeshPart") then
+                        local trackCenter = v.Position
+                        local direction = (trackCenter - hrp.Position).Unit
+                        direction = Vector3.new(direction.X, 0, direction.Z)
+                        humanoid:Move(direction)
+                        break
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function StopRaceEngine()
+    if RaceEngine.Connection then
+        RaceEngine.Connection:Disconnect()
+        RaceEngine.Connection = nil
+    end
+    CleanupSpeedHack()
+end
+
+-- ============================================================
+-- MISC FUNCTIONS
+-- ============================================================
+-- Auto Farm
+local FarmConnection
+local function StartAutoFarm()
+    if FarmConnection then return end
+    Notify("💰 Auto Farm", "Activated!")
+
+    FarmConnection = RunService.Heartbeat:Connect(function()
+        if not Config.AutoFarm then return end
+        UpdateGameState()
+
+        if GameState.IsClickPhase then
+            for i = 1, 5 do
+                if Remotes.Click then
+                    pcall(function() Remotes.Click:FireServer() end)
+                end
+            end
+        end
+
         if GameState.IsRaceActive then
             ApplySpeedHack()
-            humanoid:Move(Vector3.new(0, 0, -1))
-
-            -- Teleport ke finish
+            GetHumanoid():Move(Vector3.new(0, 0, -1))
+            local hrp = GetHRP()
             for _, v in pairs(workspace:GetDescendants()) do
                 if v.Name:lower():find("finish") or v.Name:lower():find("end") then
                     if v:IsA("BasePart") or v:IsA("MeshPart") then
-                        pcall(function()
-                            hrp.CFrame = v.CFrame + Vector3.new(0, 5, 0)
-                        end)
+                        pcall(function() hrp.CFrame = v.CFrame + Vector3.new(0, 5, 0) end)
                         break
                     end
                 end
@@ -460,30 +421,22 @@ local function StopAutoFarm()
     end
 end
 
--- ============================================================
--- AUTO REBIRTH
--- ============================================================
+-- Auto Rebirth
 local RebirthConnection
 local function StartAutoRebirth()
     if RebirthConnection then return end
-
-    Notify("Race Clicker", "Auto Rebirth ACTIVATED!")
+    Notify("🔄 Auto Rebirth", "Activated!")
 
     RebirthConnection = RunService.Heartbeat:Connect(function()
         if not Config.AutoRebirth then return end
 
         if Remotes.Rebirth then
-            pcall(function()
-                Remotes.Rebirth:FireServer()
-            end)
+            pcall(function() Remotes.Rebirth:FireServer() end)
         else
             for _, v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
                 if v:IsA("TextButton") or v:IsA("ImageButton") then
-                    local name = v.Name:lower()
-                    if name:find("rebirth") then
-                        pcall(function()
-                            v.MouseButton1Click:Fire()
-                        end)
+                    if v.Name:lower():find("rebirth") then
+                        pcall(function() v.MouseButton1Click:Fire() end)
                     end
                 end
             end
@@ -500,22 +453,17 @@ local function StopAutoRebirth()
     end
 end
 
--- ============================================================
--- AUTO HATCH EGGS
--- ============================================================
+-- Auto Hatch
 local HatchConnection
 local function StartAutoHatch()
     if HatchConnection then return end
-
-    Notify("Race Clicker", "Auto Hatch ACTIVATED!")
+    Notify("🥚 Auto Hatch", "Activated!")
 
     HatchConnection = RunService.Heartbeat:Connect(function()
         if not Config.AutoHatch then return end
 
         if Remotes.Hatch then
-            pcall(function()
-                Remotes.Hatch:FireServer("BestEgg")
-            end)
+            pcall(function() Remotes.Hatch:FireServer("BestEgg") end)
         else
             for _, v in pairs(workspace:GetDescendants()) do
                 if v.Name:lower():find("egg") and (v:IsA("BasePart") or v:IsA("MeshPart")) then
@@ -545,30 +493,23 @@ local function StopAutoHatch()
     end
 end
 
--- ============================================================
--- AUTO EQUIP BEST PETS
--- ============================================================
+-- Auto Equip Best Pets
 local EquipConnection
 local function StartAutoEquip()
     if EquipConnection then return end
-
-    Notify("Race Clicker", "Auto Equip Best Pets ACTIVATED!")
+    Notify("🐾 Auto Equip", "Activated!")
 
     EquipConnection = RunService.Heartbeat:Connect(function()
         if not Config.AutoEquipBestPets then return end
 
         if Remotes.EquipPet then
-            pcall(function()
-                Remotes.EquipPet:FireServer("BestPets")
-            end)
+            pcall(function() Remotes.EquipPet:FireServer("BestPets") end)
         else
             for _, v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
                 if v:IsA("TextButton") or v:IsA("ImageButton") then
                     local name = v.Name:lower()
                     if name:find("equip") and name:find("pet") then
-                        pcall(function()
-                            v.MouseButton1Click:Fire()
-                        end)
+                        pcall(function() v.MouseButton1Click:Fire() end)
                     end
                 end
             end
@@ -585,9 +526,7 @@ local function StopAutoEquip()
     end
 end
 
--- ============================================================
--- AUTO REDEEM CODES
--- ============================================================
+-- Redeem Codes
 local Codes = {
     "Easter!", "Fantasy", "Season14", "NewPotion", "Ninja",
     "RaceTrack", "67", "Christmas", "XMAS", "Winter",
@@ -595,13 +534,10 @@ local Codes = {
 }
 
 local function RedeemAllCodes()
-    Notify("Race Clicker", "Redeeming all codes...")
-
+    Notify("🎫 Codes", "Redeeming...")
     for _, code in pairs(Codes) do
         if Remotes.RedeemCode then
-            pcall(function()
-                Remotes.RedeemCode:FireServer(code)
-            end)
+            pcall(function() Remotes.RedeemCode:FireServer(code) end)
         else
             for _, v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
                 if v:IsA("TextBox") and v.Name:lower():find("code") then
@@ -618,82 +554,12 @@ local function RedeemAllCodes()
         end
         task.wait(0.5)
     end
-
-    Notify("Race Clicker", "All codes redeemed! ✅")
+    Notify("🎫 Codes", "All redeemed!")
 end
 
--- ============================================================
--- ANTI FALL / AUTO STEER
--- ============================================================
-local AntiFallConnection
-local function StartAntiFall()
-    if AntiFallConnection then return end
-
-    Notify("Race Clicker", "Anti-Fall ACTIVATED!")
-
-    AntiFallConnection = RunService.Heartbeat:Connect(function()
-        if not Config.AntiFall then return end
-
-        local hrp = GetHRP()
-        local humanoid = GetHumanoid()
-
-        -- Anti fall
-        if hrp.Position.Y < -50 then
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v.Name:lower():find("spawn") or v.Name:lower():find("start") then
-                    if v:IsA("BasePart") or v:IsA("MeshPart") then
-                        hrp.CFrame = v.CFrame + Vector3.new(0, 5, 0)
-                        break
-                    end
-                end
-            end
-        end
-
-        -- Auto steer
-        if Config.AutoSteer then
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v.Name:lower():find("track") or v.Name:lower():find("path") then
-                    if v:IsA("BasePart") or v:IsA("MeshPart") then
-                        local trackCenter = v.Position
-                        local direction = (trackCenter - hrp.Position).Unit
-                        direction = Vector3.new(direction.X, 0, direction.Z)
-                        humanoid:Move(direction)
-                        break
-                    end
-                end
-            end
-        end
-    end)
-end
-
-local function StopAntiFall()
-    if AntiFallConnection then
-        AntiFallConnection:Disconnect()
-        AntiFallConnection = nil
-    end
-end
-
--- ============================================================
--- WALKSPEED & JUMPPOWER
--- ============================================================
-local function ApplySpeedMods()
-    local humanoid = GetHumanoid()
-    humanoid.WalkSpeed = Config.WalkSpeed
-    humanoid.JumpPower = Config.JumpPower
-end
-
-local SpeedModConnection
-local function StartSpeedMods()
-    SpeedModConnection = RunService.Heartbeat:Connect(function()
-        ApplySpeedMods()
-    end)
-end
-
--- ============================================================
--- TELEPORT TO BEST WORLD
--- ============================================================
+-- Teleport Best World
 local function TeleportToBestWorld()
-    Notify("Race Clicker", "Teleporting...")
+    Notify("🌍 Teleport", "Finding best world...")
 
     if Remotes.Teleport then
         pcall(function()
@@ -718,813 +584,757 @@ local function TeleportToBestWorld()
         end
 
         if bestWorld and (bestWorld:IsA("BasePart") or bestWorld:IsA("MeshPart")) then
-            local hrp = GetHRP()
-            hrp.CFrame = bestWorld.CFrame + Vector3.new(0, 5, 0)
+            GetHRP().CFrame = bestWorld.CFrame + Vector3.new(0, 5, 0)
         end
     end
 end
 
+-- Speed Mods
+local SpeedModConnection
+local function ApplySpeedMods()
+    local humanoid = GetHumanoid()
+    humanoid.WalkSpeed = Config.WalkSpeed
+    humanoid.JumpPower = Config.JumpPower
+end
+
+local function StartSpeedMods()
+    SpeedModConnection = RunService.Heartbeat:Connect(function()
+        ApplySpeedMods()
+    end)
+end
+
 -- ============================================================
--- MODERN UI @XYROOXELLZ STYLE
+-- UI: MICRO BLACK & WHITE ROOT TERMINAL STYLE
 -- ============================================================
 
--- Destroy existing GUI
-if game.CoreGui:FindFirstChild("XyrooXellzRaceClicker") then
-    game.CoreGui:FindFirstChild("XyrooXellzRaceClicker"):Destroy()
+-- Destroy existing
+if game.CoreGui:FindFirstChild("XyrooXellzTerminal") then
+    game.CoreGui:FindFirstChild("XyrooXellzTerminal"):Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "XyrooXellzRaceClicker"
+ScreenGui.Name = "XyrooXellzTerminal"
 ScreenGui.Parent = game.CoreGui
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Blur Background
+-- Terminal Colors
+local Colors = {
+    BG = Color3.fromRGB(8, 8, 12),
+    Panel = Color3.fromRGB(15, 15, 20),
+    PanelHover = Color3.fromRGB(25, 25, 30),
+    Text = Color3.fromRGB(230, 230, 230),
+    TextDim = Color3.fromRGB(120, 120, 120),
+    Accent = Color3.fromRGB(255, 255, 255),
+    AccentGlow = Color3.fromRGB(200, 200, 200),
+    Green = Color3.fromRGB(100, 255, 100),
+    Red = Color3.fromRGB(255, 80, 80),
+    Border = Color3.fromRGB(40, 40, 45),
+}
+
+-- Blur Effect
 local Blur = Instance.new("BlurEffect")
 Blur.Size = 0
 Blur.Parent = Lighting
 
--- Loading Screen
+-- ============================================================
+-- LOADING SCREEN
+-- ============================================================
 local LoadingFrame = Instance.new("Frame")
-LoadingFrame.Name = "LoadingFrame"
 LoadingFrame.Size = UDim2.new(1, 0, 1, 0)
-LoadingFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-LoadingFrame.BackgroundTransparency = 0
+LoadingFrame.BackgroundColor3 = Colors.BG
 LoadingFrame.BorderSizePixel = 0
 LoadingFrame.ZIndex = 100
 LoadingFrame.Parent = ScreenGui
 
-local LoadingCorner = Instance.new("UICorner")
-LoadingCorner.CornerRadius = UDim.new(0, 0)
-LoadingCorner.Parent = LoadingFrame
-
--- Loading Title
 local LoadingTitle = Instance.new("TextLabel")
-LoadingTitle.Size = UDim2.new(0, 400, 0, 50)
-LoadingTitle.Position = UDim2.new(0.5, -200, 0.4, 0)
+LoadingTitle.Size = UDim2.new(0, 500, 0, 40)
+LoadingTitle.Position = UDim2.new(0.5, -250, 0.38, 0)
 LoadingTitle.BackgroundTransparency = 1
-LoadingTitle.Text = "🏁 RACE CLICKER"
-LoadingTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
-LoadingTitle.TextSize = 36
-LoadingTitle.Font = Enum.Font.GothamBlack
+LoadingTitle.Text = "XYROOXELLZ // RACE CLICKER"
+LoadingTitle.TextColor3 = Colors.Text
+LoadingTitle.TextSize = 28
+LoadingTitle.Font = Enum.Font.Code
 LoadingTitle.ZIndex = 101
 LoadingTitle.Parent = LoadingFrame
 
--- Developer Credit
-local DevCredit = Instance.new("TextLabel")
-DevCredit.Size = UDim2.new(0, 400, 0, 30)
-DevCredit.Position = UDim2.new(0.5, -200, 0.45, 0)
-DevCredit.BackgroundTransparency = 1
-DevCredit.Text = "@XyrooXellz | Ultimate Cheat v3.0"
-DevCredit.TextColor3 = Color3.fromRGB(150, 150, 150)
-DevCredit.TextSize = 14
-DevCredit.Font = Enum.Font.GothamSemibold
-DevCredit.ZIndex = 101
-DevCredit.Parent = LoadingFrame
+local LoadingSub = Instance.new("TextLabel")
+LoadingSub.Size = UDim2.new(0, 500, 0, 20)
+LoadingSub.Position = UDim2.new(0.5, -250, 0.43, 0)
+LoadingSub.BackgroundTransparency = 1
+LoadingSub.Text = "INITIALIZING ROOT TERMINAL v4.0"
+LoadingSub.TextColor3 = Colors.TextDim
+LoadingSub.TextSize = 12
+LoadingSub.Font = Enum.Font.Code
+LoadingSub.ZIndex = 101
+LoadingSub.Parent = LoadingFrame
 
--- Progress Bar Background
-local ProgressBg = Instance.new("Frame")
-ProgressBg.Name = "ProgressBg"
-ProgressBg.Size = UDim2.new(0, 300, 0, 8)
-ProgressBg.Position = UDim2.new(0.5, -150, 0.52, 0)
-ProgressBg.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-ProgressBg.BorderSizePixel = 0
-ProgressBg.ZIndex = 101
-ProgressBg.Parent = LoadingFrame
+-- Terminal-style progress
+local ProgressContainer = Instance.new("Frame")
+ProgressContainer.Size = UDim2.new(0, 400, 0, 20)
+ProgressContainer.Position = UDim2.new(0.5, -200, 0.48, 0)
+ProgressContainer.BackgroundColor3 = Colors.Panel
+ProgressContainer.BorderSizePixel = 0
+ProgressContainer.ZIndex = 101
+ProgressContainer.Parent = LoadingFrame
 
-local ProgressBgCorner = Instance.new("UICorner")
-ProgressBgCorner.CornerRadius = UDim.new(0, 4)
-ProgressBgCorner.Parent = ProgressBg
+local ProgressBorder = Instance.new("UIStroke")
+ProgressBorder.Color = Colors.Border
+ProgressBorder.Thickness = 1
+ProgressBorder.Parent = ProgressContainer
 
--- Progress Bar Fill
 local ProgressFill = Instance.new("Frame")
-ProgressFill.Name = "ProgressFill"
 ProgressFill.Size = UDim2.new(0, 0, 1, 0)
-ProgressFill.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+ProgressFill.BackgroundColor3 = Colors.Text
 ProgressFill.BorderSizePixel = 0
 ProgressFill.ZIndex = 102
-ProgressFill.Parent = ProgressBg
+ProgressFill.Parent = ProgressContainer
 
-local ProgressFillCorner = Instance.new("UICorner")
-ProgressFillCorner.CornerRadius = UDim.new(0, 4)
-ProgressFillCorner.Parent = ProgressFill
-
--- Progress Text
 local ProgressText = Instance.new("TextLabel")
-ProgressText.Size = UDim2.new(0, 300, 0, 25)
-ProgressText.Position = UDim2.new(0.5, -150, 0.55, 0)
+ProgressText.Size = UDim2.new(0, 400, 0, 20)
+ProgressText.Position = UDim2.new(0.5, -200, 0.52, 0)
 ProgressText.BackgroundTransparency = 1
-ProgressText.Text = "0%"
-ProgressText.TextColor3 = Color3.fromRGB(255, 255, 255)
-ProgressText.TextSize = 14
-ProgressText.Font = Enum.Font.GothamBold
+ProgressText.Text = "> BOOTING..."
+ProgressText.TextColor3 = Colors.Green
+ProgressText.TextSize = 11
+ProgressText.Font = Enum.Font.Code
 ProgressText.ZIndex = 101
 ProgressText.Parent = LoadingFrame
 
--- Loading Animation
-local loadingSteps = {
-    "Detecting game...",
-    "Finding remotes...",
-    "Loading modules...",
-    "Building UI...",
-    "Initializing hacks...",
-    "Ready!"
+-- Log lines
+local LogLines = {}
+for i = 1, 5 do
+    local line = Instance.new("TextLabel")
+    line.Size = UDim2.new(0, 500, 0, 16)
+    line.Position = UDim2.new(0.5, -250, 0.56 + (i * 0.02), 0)
+    line.BackgroundTransparency = 1
+    line.Text = ""
+    line.TextColor3 = Colors.TextDim
+    line.TextSize = 10
+    line.Font = Enum.Font.Code
+    line.TextXAlignment = Enum.TextXAlignment.Left
+    line.ZIndex = 101
+    line.Parent = LoadingFrame
+    LogLines[i] = line
+end
+
+local bootLogs = {
+    "> [OK] Connected to game server",
+    "> [OK] Remote events detected",
+    "> [OK] Player data loaded",
+    "> [OK] Modules initialized",
+    "> [OK] UI rendering...",
 }
 
-local function PlayLoadingAnimation()
-    for i, step in ipairs(loadingSteps) do
-        local progress = (i / #loadingSteps)
-
-        -- Animate progress bar
-        TweenService:Create(ProgressFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(progress, 0, 1, 0)
-        }):Play()
-
-        ProgressText.Text = math.floor(progress * 100) .. "% - " .. step
-
-        task.wait(0.6)
+local function PlayBootSequence()
+    for i, log in ipairs(bootLogs) do
+        LogLines[i].Text = log
+        task.wait(0.3)
     end
 
-    -- Fade out loading
-    TweenService:Create(LoadingFrame, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        BackgroundTransparency = 1
-    }):Play()
+    for i = 1, 100 do
+        local progress = i / 100
+        ProgressFill.Size = UDim2.new(progress, 0, 1, 0)
+        ProgressText.Text = "> LOADING " .. i .. "%"
+        task.wait(0.02)
+    end
 
-    TweenService:Create(LoadingTitle, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
-    TweenService:Create(DevCredit, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
-    TweenService:Create(ProgressBg, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-    TweenService:Create(ProgressFill, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-    TweenService:Create(ProgressText, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+    ProgressText.Text = "> SYSTEM READY"
+    ProgressText.TextColor3 = Colors.Green
+    task.wait(0.5)
 
-    task.wait(1)
+    TweenService:Create(LoadingFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+    for _, child in pairs(LoadingFrame:GetDescendants()) do
+        if child:IsA("TextLabel") or child:IsA("Frame") then
+            TweenService:Create(child, TweenInfo.new(0.3), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
+        end
+    end
+
+    task.wait(0.6)
     LoadingFrame:Destroy()
 end
 
 -- ============================================================
--- MAIN UI FRAME
+-- MAIN TERMINAL FRAME
 -- ============================================================
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 380, 0, 520)
-MainFrame.Position = UDim2.new(0.5, -190, 0.5, -260)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-MainFrame.BackgroundTransparency = 0.1
+MainFrame.Name = "MainTerminal"
+MainFrame.Size = UDim2.new(0, 420, 0, 540)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -270)
+MainFrame.BackgroundColor3 = Colors.BG
+MainFrame.BackgroundTransparency = 0.05
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.ZIndex = 10
 MainFrame.Parent = ScreenGui
 
--- Main Corner
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 16)
-MainCorner.Parent = MainFrame
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Colors.Border
+MainStroke.Thickness = 1
+MainStroke.Parent = MainFrame
 
--- Glow Effect
-local Glow = Instance.new("ImageLabel")
-Glow.Name = "Glow"
-Glow.Size = UDim2.new(1, 40, 1, 40)
-Glow.Position = UDim2.new(0, -20, 0, -20)
-Glow.BackgroundTransparency = 1
-Glow.Image = "rbxassetid://4996891970"
-Glow.ImageColor3 = Color3.fromRGB(255, 215, 0)
-Glow.ImageTransparency = 0.9
-Glow.ZIndex = 9
-Glow.Parent = MainFrame
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 36)
+TitleBar.BackgroundColor3 = Colors.Panel
+TitleBar.BorderSizePixel = 0
+TitleBar.ZIndex = 11
+TitleBar.Parent = MainFrame
 
--- Top Bar
-local TopBar = Instance.new("Frame")
-TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 50)
-TopBar.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-TopBar.BorderSizePixel = 0
-TopBar.ZIndex = 11
-TopBar.Parent = MainFrame
+local TitleBarStroke = Instance.new("UIStroke")
+TitleBarStroke.Color = Colors.Border
+TitleBarStroke.Thickness = 1
+TitleBarStroke.Parent = TitleBar
 
-local TopBarCorner = Instance.new("UICorner")
-TopBarCorner.CornerRadius = UDim.new(0, 16)
-TopBarCorner.Parent = TopBar
-
--- Bottom fix for top bar
-local TopBarFix = Instance.new("Frame")
-TopBarFix.Size = UDim2.new(1, 0, 0, 20)
-TopBarFix.Position = UDim2.new(0, 0, 0, 30)
-TopBarFix.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-TopBarFix.BorderSizePixel = 0
-TopBarFix.ZIndex = 11
-TopBarFix.Parent = TopBar
-
--- Title Icon
-local TitleIcon = Instance.new("TextLabel")
-TitleIcon.Size = UDim2.new(0, 40, 0, 40)
-TitleIcon.Position = UDim2.new(0, 10, 0, 5)
-TitleIcon.BackgroundTransparency = 1
-TitleIcon.Text = "🏁"
-TitleIcon.TextSize = 24
-TitleIcon.ZIndex = 12
-TitleIcon.Parent = TopBar
-
--- Title Text
+-- Title
 local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(0, 200, 0, 25)
-TitleText.Position = UDim2.new(0, 50, 0, 5)
+TitleText.Size = UDim2.new(0, 250, 0, 36)
+TitleText.Position = UDim2.new(0, 12, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "RACE CLICKER"
-TitleText.TextColor3 = Color3.fromRGB(255, 215, 0)
-TitleText.TextSize = 18
-TitleText.Font = Enum.Font.GothamBlack
+TitleText.Text = "XYROOXELLZ // RACE_CLICKER"
+TitleText.TextColor3 = Colors.Text
+TitleText.TextSize = 13
+TitleText.Font = Enum.Font.Code
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.ZIndex = 12
-TitleText.Parent = TopBar
+TitleText.Parent = TitleBar
 
--- Subtitle
-local SubtitleText = Instance.new("TextLabel")
-SubtitleText.Size = UDim2.new(0, 200, 0, 18)
-SubtitleText.Position = UDim2.new(0, 50, 0, 28)
-SubtitleText.BackgroundTransparency = 1
-SubtitleText.Text = "@XyrooXellz | v3.0"
-SubtitleText.TextColor3 = Color3.fromRGB(120, 120, 140)
-SubtitleText.TextSize = 11
-SubtitleText.Font = Enum.Font.GothamSemibold
-SubtitleText.TextXAlignment = Enum.TextXAlignment.Left
-SubtitleText.ZIndex = 12
-SubtitleText.Parent = TopBar
+-- Status
+local StatusIndicator = Instance.new("Frame")
+StatusIndicator.Size = UDim2.new(0, 6, 0, 6)
+StatusIndicator.Position = UDim2.new(1, -50, 0, 15)
+StatusIndicator.BackgroundColor3 = Colors.Green
+StatusIndicator.BorderSizePixel = 0
+StatusIndicator.ZIndex = 12
+StatusIndicator.Parent = TitleBar
 
--- Status Indicator
-local StatusDot = Instance.new("Frame")
-StatusDot.Size = UDim2.new(0, 8, 0, 8)
-StatusDot.Position = UDim2.new(1, -60, 0, 21)
-StatusDot.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-StatusDot.BorderSizePixel = 0
-StatusDot.ZIndex = 12
-StatusDot.Parent = TopBar
+local StatusCorner = Instance.new("UICorner")
+StatusCorner.CornerRadius = UDim.new(1, 0)
+StatusCorner.Parent = StatusIndicator
 
-local StatusDotCorner = Instance.new("UICorner")
-StatusDotCorner.CornerRadius = UDim.new(1, 0)
-StatusDotCorner.Parent = StatusDot
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(0, 40, 0, 36)
+StatusText.Position = UDim2.new(1, -42, 0, 0)
+StatusText.BackgroundTransparency = 1
+StatusText.Text = "ONLINE"
+StatusText.TextColor3 = Colors.Green
+StatusText.TextSize = 9
+StatusText.Font = Enum.Font.Code
+StatusText.ZIndex = 12
+StatusText.Parent = TitleBar
 
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0, 50, 0, 20)
-StatusLabel.Position = UDim2.new(1, -50, 0, 15)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "ONLINE"
-StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-StatusLabel.TextSize = 10
-StatusLabel.Font = Enum.Font.GothamBold
-StatusLabel.ZIndex = 12
-StatusLabel.Parent = TopBar
-
--- Close Button
+-- Close
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 32, 0, 32)
-CloseBtn.Position = UDim2.new(1, -38, 0, 9)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.Text = ""
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -32, 0, 3)
+CloseBtn.BackgroundColor3 = Colors.Panel
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Colors.Text
+CloseBtn.TextSize = 18
+CloseBtn.Font = Enum.Font.Code
 CloseBtn.AutoButtonColor = false
 CloseBtn.ZIndex = 12
-CloseBtn.Parent = TopBar
+CloseBtn.Parent = TitleBar
 
-local CloseBtnCorner = Instance.new("UICorner")
-CloseBtnCorner.CornerRadius = UDim.new(0, 8)
-CloseBtnCorner.Parent = CloseBtn
-
-local CloseIcon = Instance.new("TextLabel")
-CloseIcon.Size = UDim2.new(1, 0, 1, 0)
-CloseIcon.BackgroundTransparency = 1
-CloseIcon.Text = "✕"
-CloseIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseIcon.TextSize = 16
-CloseIcon.Font = Enum.Font.GothamBold
-CloseIcon.ZIndex = 13
-CloseIcon.Parent = CloseBtn
-
--- Minimize Button
+-- Minimize
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 32, 0, 32)
-MinBtn.Position = UDim2.new(1, -75, 0, 9)
-MinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-MinBtn.Text = ""
+MinBtn.Size = UDim2.new(0, 30, 0, 30)
+MinBtn.Position = UDim2.new(1, -64, 0, 3)
+MinBtn.BackgroundColor3 = Colors.Panel
+MinBtn.Text = "−"
+MinBtn.TextColor3 = Colors.Text
+MinBtn.TextSize = 18
+MinBtn.Font = Enum.Font.Code
 MinBtn.AutoButtonColor = false
 MinBtn.ZIndex = 12
-MinBtn.Parent = TopBar
-
-local MinBtnCorner = Instance.new("UICorner")
-MinBtnCorner.CornerRadius = UDim.new(0, 8)
-MinBtnCorner.Parent = MinBtn
-
-local MinIcon = Instance.new("TextLabel")
-MinIcon.Size = UDim2.new(1, 0, 1, 0)
-MinIcon.BackgroundTransparency = 1
-MinIcon.Text = "−"
-MinIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinIcon.TextSize = 20
-MinIcon.Font = Enum.Font.GothamBold
-MinIcon.ZIndex = 13
-MinIcon.Parent = MinBtn
+MinBtn.Parent = TitleBar
 
 -- ============================================================
--- CONTENT AREA
+-- TAB SYSTEM
 -- ============================================================
-local ContentFrame = Instance.new("ScrollingFrame")
-ContentFrame.Name = "ContentFrame"
-ContentFrame.Size = UDim2.new(1, -20, 1, -110)
-ContentFrame.Position = UDim2.new(0, 10, 0, 60)
-ContentFrame.BackgroundTransparency = 1
-ContentFrame.ScrollBarThickness = 3
-ContentFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 215, 0)
-ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 600)
-ContentFrame.ZIndex = 11
-ContentFrame.Parent = MainFrame
+local CurrentTab = "RACE"
+local Tabs = {}
+local TabContents = {}
 
-local ContentLayout = Instance.new("UIListLayout")
-ContentLayout.Padding = UDim.new(0, 8)
-ContentLayout.Parent = ContentFrame
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1, 0, 0, 32)
+TabBar.Position = UDim2.new(0, 0, 0, 36)
+TabBar.BackgroundColor3 = Colors.BG
+TabBar.BorderSizePixel = 0
+TabBar.ZIndex = 11
+TabBar.Parent = MainFrame
 
--- ============================================================
--- CATEGORY HEADERS
--- ============================================================
-local function CreateCategory(text)
-    local Category = Instance.new("TextLabel")
-    Category.Size = UDim2.new(1, -10, 0, 25)
-    Category.BackgroundTransparency = 1
-    Category.Text = "▸ " .. text
-    Category.TextColor3 = Color3.fromRGB(255, 215, 0)
-    Category.TextSize = 13
-    Category.Font = Enum.Font.GothamBold
-    Category.TextXAlignment = Enum.TextXAlignment.Left
-    Category.ZIndex = 12
-    Category.Parent = ContentFrame
-    return Category
+local TabBarStroke = Instance.new("UIStroke")
+TabBarStroke.Color = Colors.Border
+TabBarStroke.Thickness = 1
+TabBarStroke.Parent = TabBar
+
+local function CreateTab(name, icon)
+    local TabBtn = Instance.new("TextButton")
+    TabBtn.Size = UDim2.new(0, 100, 1, 0)
+    TabBtn.BackgroundColor3 = Colors.BG
+    TabBtn.Text = "[" .. name .. "]"
+    TabBtn.TextColor3 = Colors.TextDim
+    TabBtn.TextSize = 11
+    TabBtn.Font = Enum.Font.Code
+    TabBtn.AutoButtonColor = false
+    TabBtn.ZIndex = 12
+    TabBtn.Parent = TabBar
+
+    local TabIndicator = Instance.new("Frame")
+    TabIndicator.Size = UDim2.new(1, 0, 0, 2)
+    TabIndicator.Position = UDim2.new(0, 0, 1, -2)
+    TabIndicator.BackgroundColor3 = Colors.Text
+    TabIndicator.BorderSizePixel = 0
+    TabIndicator.Visible = false
+    TabIndicator.ZIndex = 13
+    TabIndicator.Parent = TabBtn
+
+    Tabs[name] = {Button = TabBtn, Indicator = TabIndicator}
+
+    -- Content Frame
+    local Content = Instance.new("ScrollingFrame")
+    Content.Name = name .. "Content"
+    Content.Size = UDim2.new(1, -16, 1, -100)
+    Content.Position = UDim2.new(0, 8, 0, 72)
+    Content.BackgroundTransparency = 1
+    Content.ScrollBarThickness = 2
+    Content.ScrollBarImageColor3 = Colors.TextDim
+    Content.CanvasSize = UDim2.new(0, 0, 0, 500)
+    Content.ZIndex = 11
+    Content.Visible = false
+    Content.Parent = MainFrame
+
+    local ContentLayout = Instance.new("UIListLayout")
+    ContentLayout.Padding = UDim.new(0, 6)
+    ContentLayout.Parent = Content
+
+    TabContents[name] = Content
+
+    TabBtn.MouseButton1Click:Connect(function()
+        for tabName, tabData in pairs(Tabs) do
+            tabData.Button.TextColor3 = Colors.TextDim
+            tabData.Indicator.Visible = false
+            TabContents[tabName].Visible = false
+        end
+
+        TabBtn.TextColor3 = Colors.Text
+        TabIndicator.Visible = true
+        Content.Visible = true
+        CurrentTab = name
+    end)
+
+    -- Hover
+    TabBtn.MouseEnter:Connect(function()
+        if CurrentTab ~= name then
+            TweenService:Create(TabBtn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.PanelHover}):Play()
+        end
+    end)
+
+    TabBtn.MouseLeave:Connect(function()
+        if CurrentTab ~= name then
+            TweenService:Create(TabBtn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.BG}):Play()
+        end
+    end)
+
+    return Content
 end
 
+-- Create tabs
+local RaceContent = CreateTab("RACE", "🏁")
+local MiscContent = CreateTab("MISC", "⚙️")
+local ProfileContent = CreateTab("PROFILE", "👤")
+
+-- Position tabs
+local tabNames = {"RACE", "MISC", "PROFILE"}
+for i, name in ipairs(tabNames) do
+    Tabs[name].Button.Position = UDim2.new(0, (i - 1) * 100, 0, 0)
+end
+
+-- Default active
+Tabs["RACE"].Button.TextColor3 = Colors.Text
+Tabs["RACE"].Indicator.Visible = true
+TabContents["RACE"].Visible = true
+
 -- ============================================================
--- MODERN TOGGLE BUTTON
+-- UI COMPONENTS
 -- ============================================================
-local function CreateToggle(name, configKey, startFunc, stopFunc, icon)
-    icon = icon or "⚡"
+local function CreateSection(parent, text)
+    local Section = Instance.new("TextLabel")
+    Section.Size = UDim2.new(1, -10, 0, 22)
+    Section.BackgroundTransparency = 1
+    Section.Text = "// " .. text:upper()
+    Section.TextColor3 = Colors.TextDim
+    Section.TextSize = 10
+    Section.Font = Enum.Font.Code
+    Section.TextXAlignment = Enum.TextXAlignment.Left
+    Section.ZIndex = 12
+    Section.Parent = parent
+    return Section
+end
 
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, -10, 0, 45)
-    ToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    ToggleFrame.BorderSizePixel = 0
-    ToggleFrame.ZIndex = 12
-    ToggleFrame.Parent = ContentFrame
+local function CreateToggle(parent, name, configKey, startFunc, stopFunc)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, -10, 0, 38)
+    Frame.BackgroundColor3 = Colors.Panel
+    Frame.BorderSizePixel = 0
+    Frame.ZIndex = 12
+    Frame.Parent = parent
 
-    local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(0, 10)
-    ToggleCorner.Parent = ToggleFrame
-
-    -- Icon
-    local IconLabel = Instance.new("TextLabel")
-    IconLabel.Size = UDim2.new(0, 30, 0, 30)
-    IconLabel.Position = UDim2.new(0, 10, 0, 7)
-    IconLabel.BackgroundTransparency = 1
-    IconLabel.Text = icon
-    IconLabel.TextSize = 18
-    IconLabel.ZIndex = 13
-    IconLabel.Parent = ToggleFrame
+    local FrameStroke = Instance.new("UIStroke")
+    FrameStroke.Color = Colors.Border
+    FrameStroke.Thickness = 1
+    FrameStroke.Parent = Frame
 
     -- Name
     local NameLabel = Instance.new("TextLabel")
-    NameLabel.Size = UDim2.new(0, 200, 0, 20)
-    NameLabel.Position = UDim2.new(0, 45, 0, 5)
+    NameLabel.Size = UDim2.new(0, 200, 0, 38)
+    NameLabel.Position = UDim2.new(0, 12, 0, 0)
     NameLabel.BackgroundTransparency = 1
-    NameLabel.Text = name
-    NameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NameLabel.TextSize = 13
-    NameLabel.Font = Enum.Font.GothamSemibold
+    NameLabel.Text = "> " .. name
+    NameLabel.TextColor3 = Colors.Text
+    NameLabel.TextSize = 12
+    NameLabel.Font = Enum.Font.Code
     NameLabel.TextXAlignment = Enum.TextXAlignment.Left
     NameLabel.ZIndex = 13
-    NameLabel.Parent = ToggleFrame
+    NameLabel.Parent = Frame
 
     -- Status
-    local StatusText = Instance.new("TextLabel")
-    StatusText.Size = UDim2.new(0, 200, 0, 15)
-    StatusText.Position = UDim2.new(0, 45, 0, 24)
-    StatusText.BackgroundTransparency = 1
-    StatusText.Text = "OFF"
-    StatusText.TextColor3 = Color3.fromRGB(150, 150, 150)
-    StatusText.TextSize = 10
-    StatusText.Font = Enum.Font.Gotham
-    StatusText.TextXAlignment = Enum.TextXAlignment.Left
-    StatusText.ZIndex = 13
-    StatusText.Parent = ToggleFrame
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Size = UDim2.new(0, 50, 0, 38)
+    StatusLabel.Position = UDim2.new(1, -90, 0, 0)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Text = "[OFF]"
+    StatusLabel.TextColor3 = Colors.Red
+    StatusLabel.TextSize = 10
+    StatusLabel.Font = Enum.Font.Code
+    StatusLabel.ZIndex = 13
+    StatusLabel.Parent = Frame
 
-    -- Toggle Switch
-    local SwitchBg = Instance.new("Frame")
-    SwitchBg.Size = UDim2.new(0, 44, 0, 24)
-    SwitchBg.Position = UDim2.new(1, -54, 0, 10)
-    SwitchBg.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    SwitchBg.BorderSizePixel = 0
-    SwitchBg.ZIndex = 13
-    SwitchBg.Parent = ToggleFrame
+    -- Toggle Button
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Size = UDim2.new(0, 50, 0, 24)
+    ToggleBtn.Position = UDim2.new(1, -62, 0, 7)
+    ToggleBtn.BackgroundColor3 = Colors.PanelHover
+    ToggleBtn.Text = "EXEC"
+    ToggleBtn.TextColor3 = Colors.TextDim
+    ToggleBtn.TextSize = 10
+    ToggleBtn.Font = Enum.Font.Code
+    ToggleBtn.AutoButtonColor = false
+    ToggleBtn.ZIndex = 13
+    ToggleBtn.Parent = Frame
 
-    local SwitchCorner = Instance.new("UICorner")
-    SwitchCorner.CornerRadius = UDim.new(1, 0)
-    SwitchCorner.Parent = SwitchBg
+    local ToggleStroke = Instance.new("UIStroke")
+    ToggleStroke.Color = Colors.Border
+    ToggleStroke.Thickness = 1
+    ToggleStroke.Parent = ToggleBtn
 
-    local SwitchKnob = Instance.new("Frame")
-    SwitchKnob.Size = UDim2.new(0, 20, 0, 20)
-    SwitchKnob.Position = UDim2.new(0, 2, 0, 2)
-    SwitchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    SwitchKnob.BorderSizePixel = 0
-    SwitchKnob.ZIndex = 14
-    SwitchKnob.Parent = SwitchBg
-
-    local SwitchKnobCorner = Instance.new("UICorner")
-    SwitchKnobCorner.CornerRadius = UDim.new(1, 0)
-    SwitchKnobCorner.Parent = SwitchKnob
-
-    -- Click Area
-    local ClickArea = Instance.new("TextButton")
-    ClickArea.Size = UDim2.new(1, 0, 1, 0)
-    ClickArea.BackgroundTransparency = 1
-    ClickArea.Text = ""
-    ClickArea.ZIndex = 15
-    ClickArea.Parent = ToggleFrame
-
-    ClickArea.MouseButton1Click:Connect(function()
+    ToggleBtn.MouseButton1Click:Connect(function()
         Config[configKey] = not Config[configKey]
 
         if Config[configKey] then
-            -- ON Animation
-            TweenService:Create(SwitchBg, TweenInfo.new(0.3), {
-                BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-            }):Play()
-            TweenService:Create(SwitchKnob, TweenInfo.new(0.3), {
-                Position = UDim2.new(0, 22, 0, 2)
-            }):Play()
-            StatusText.Text = "ON"
-            StatusText.TextColor3 = Color3.fromRGB(0, 255, 100)
-            ToggleFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 55)
-
+            StatusLabel.Text = "[ON]"
+            StatusLabel.TextColor3 = Colors.Green
+            ToggleBtn.TextColor3 = Colors.Green
+            ToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 40, 20)
+            ToggleStroke.Color = Colors.Green
             if startFunc then startFunc() end
         else
-            -- OFF Animation
-            TweenService:Create(SwitchBg, TweenInfo.new(0.3), {
-                BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-            }):Play()
-            TweenService:Create(SwitchKnob, TweenInfo.new(0.3), {
-                Position = UDim2.new(0, 2, 0, 2)
-            }):Play()
-            StatusText.Text = "OFF"
-            StatusText.TextColor3 = Color3.fromRGB(150, 150, 150)
-            ToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-
+            StatusLabel.Text = "[OFF]"
+            StatusLabel.TextColor3 = Colors.Red
+            ToggleBtn.TextColor3 = Colors.TextDim
+            ToggleBtn.BackgroundColor3 = Colors.PanelHover
+            ToggleStroke.Color = Colors.Border
             if stopFunc then stopFunc() end
         end
     end)
 
-    -- Hover effect
-    ToggleFrame.MouseEnter:Connect(function()
+    ToggleBtn.MouseEnter:Connect(function()
         if not Config[configKey] then
-            TweenService:Create(ToggleFrame, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-            }):Play()
+            TweenService:Create(ToggleBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(35, 35, 40)}):Play()
         end
     end)
 
-    ToggleFrame.MouseLeave:Connect(function()
+    ToggleBtn.MouseLeave:Connect(function()
         if not Config[configKey] then
-            TweenService:Create(ToggleFrame, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-            }):Play()
+            TweenService:Create(ToggleBtn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.PanelHover}):Play()
         end
     end)
 
-    return ToggleFrame
+    return Frame
 end
 
--- ============================================================
--- MODERN ACTION BUTTON
--- ============================================================
-local function CreateActionButton(name, callback, icon, color)
-    icon = icon or "🚀"
-    color = color or Color3.fromRGB(100, 50, 200)
+local function CreateActionButton(parent, name, callback, color)
+    color = color or Colors.Text
 
-    local ButtonFrame = Instance.new("Frame")
-    ButtonFrame.Size = UDim2.new(1, -10, 0, 45)
-    ButtonFrame.BackgroundColor3 = color
-    ButtonFrame.BorderSizePixel = 0
-    ButtonFrame.ZIndex = 12
-    ButtonFrame.Parent = ContentFrame
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, -10, 0, 38)
+    Frame.BackgroundColor3 = Colors.Panel
+    Frame.BorderSizePixel = 0
+    Frame.ZIndex = 12
+    Frame.Parent = parent
 
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 10)
-    ButtonCorner.Parent = ButtonFrame
+    local FrameStroke = Instance.new("UIStroke")
+    FrameStroke.Color = Colors.Border
+    FrameStroke.Thickness = 1
+    FrameStroke.Parent = Frame
 
-    -- Gradient
-    local Gradient = Instance.new("UIGradient")
-    Gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, color),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(
-            math.min(color.R * 255 + 30, 255),
-            math.min(color.G * 255 + 30, 255),
-            math.min(color.B * 255 + 30, 255)
-        ))
-    })
-    Gradient.Parent = ButtonFrame
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(1, 0, 1, 0)
+    Btn.BackgroundTransparency = 1
+    Btn.Text = ">>> " .. name:upper()
+    Btn.TextColor3 = color
+    Btn.TextSize = 12
+    Btn.Font = Enum.Font.Code
+    Btn.AutoButtonColor = false
+    Btn.ZIndex = 13
+    Btn.Parent = Frame
 
-    -- Icon
-    local IconLabel = Instance.new("TextLabel")
-    IconLabel.Size = UDim2.new(0, 30, 0, 30)
-    IconLabel.Position = UDim2.new(0, 10, 0, 7)
-    IconLabel.BackgroundTransparency = 1
-    IconLabel.Text = icon
-    IconLabel.TextSize = 18
-    IconLabel.ZIndex = 13
-    IconLabel.Parent = ButtonFrame
-
-    -- Name
-    local NameLabel = Instance.new("TextLabel")
-    NameLabel.Size = UDim2.new(0, 200, 0, 20)
-    NameLabel.Position = UDim2.new(0, 45, 0, 5)
-    NameLabel.BackgroundTransparency = 1
-    NameLabel.Text = name
-    NameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NameLabel.TextSize = 13
-    NameLabel.Font = Enum.Font.GothamSemibold
-    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    NameLabel.ZIndex = 13
-    NameLabel.Parent = ButtonFrame
-
-    -- Subtitle
-    local SubLabel = Instance.new("TextLabel")
-    SubLabel.Size = UDim2.new(0, 200, 0, 15)
-    SubLabel.Position = UDim2.new(0, 45, 0, 24)
-    SubLabel.BackgroundTransparency = 1
-    SubLabel.Text = "Click to execute"
-    SubLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
-    SubLabel.TextSize = 10
-    SubLabel.Font = Enum.Font.Gotham
-    SubLabel.TextXAlignment = Enum.TextXAlignment.Left
-    SubLabel.ZIndex = 13
-    SubLabel.Parent = ButtonFrame
-
-    -- Click Area
-    local ClickArea = Instance.new("TextButton")
-    ClickArea.Size = UDim2.new(1, 0, 1, 0)
-    ClickArea.BackgroundTransparency = 1
-    ClickArea.Text = ""
-    ClickArea.ZIndex = 15
-    ClickArea.Parent = ButtonFrame
-
-    ClickArea.MouseButton1Click:Connect(function()
-        -- Click animation
-        TweenService:Create(ButtonFrame, TweenInfo.new(0.1), {
-            Size = UDim2.new(0.98, -10, 0, 43)
-        }):Play()
+    Btn.MouseButton1Click:Connect(function()
+        TweenService:Create(Frame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(30, 30, 35)}):Play()
         task.wait(0.1)
-        TweenService:Create(ButtonFrame, TweenInfo.new(0.1), {
-            Size = UDim2.new(1, -10, 0, 45)
-        }):Play()
-
+        TweenService:Create(Frame, TweenInfo.new(0.1), {BackgroundColor3 = Colors.Panel}):Play()
         callback()
     end)
 
-    -- Hover effect
-    ButtonFrame.MouseEnter:Connect(function()
-        TweenService:Create(ButtonFrame, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(
-                math.min(color.R * 255 + 20, 255),
-                math.min(color.G * 255 + 20, 255),
-                math.min(color.B * 255 + 20, 255)
-            )
-        }):Play()
+    Btn.MouseEnter:Connect(function()
+        TweenService:Create(Frame, TweenInfo.new(0.15), {BackgroundColor3 = Colors.PanelHover}):Play()
+        TweenService:Create(FrameStroke, TweenInfo.new(0.15), {Color = color}):Play()
     end)
 
-    ButtonFrame.MouseLeave:Connect(function()
-        TweenService:Create(ButtonFrame, TweenInfo.new(0.2), {
-            BackgroundColor3 = color
-        }):Play()
+    Btn.MouseLeave:Connect(function()
+        TweenService:Create(Frame, TweenInfo.new(0.15), {BackgroundColor3 = Colors.Panel}):Play()
+        TweenService:Create(FrameStroke, TweenInfo.new(0.15), {Color = Colors.Border}):Play()
     end)
 
-    return ButtonFrame
+    return Frame
 end
 
--- ============================================================
--- SPEED HACK SLIDER
--- ============================================================
-local function CreateSpeedSlider()
-    local SliderFrame = Instance.new("Frame")
-    SliderFrame.Size = UDim2.new(1, -10, 0, 60)
-    SliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    SliderFrame.BorderSizePixel = 0
-    SliderFrame.ZIndex = 12
-    SliderFrame.Parent = ContentFrame
+local function CreateInfoLine(parent, label, value)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, -10, 0, 28)
+    Frame.BackgroundColor3 = Colors.Panel
+    Frame.BorderSizePixel = 0
+    Frame.ZIndex = 12
+    Frame.Parent = parent
 
-    local SliderCorner = Instance.new("UICorner")
-    SliderCorner.CornerRadius = UDim.new(0, 10)
-    SliderCorner.Parent = SliderFrame
+    local FrameStroke = Instance.new("UIStroke")
+    FrameStroke.Color = Colors.Border
+    FrameStroke.Thickness = 1
+    FrameStroke.Parent = Frame
 
-    -- Icon
-    local IconLabel = Instance.new("TextLabel")
-    IconLabel.Size = UDim2.new(0, 30, 0, 30)
-    IconLabel.Position = UDim2.new(0, 10, 0, 5)
-    IconLabel.BackgroundTransparency = 1
-    IconLabel.Text = "💨"
-    IconLabel.TextSize = 18
-    IconLabel.ZIndex = 13
-    IconLabel.Parent = SliderFrame
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0, 150, 0, 28)
+    Label.Position = UDim2.new(0, 12, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = "> " .. label
+    Label.TextColor3 = Colors.TextDim
+    Label.TextSize = 11
+    Label.Font = Enum.Font.Code
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.ZIndex = 13
+    Label.Parent = Frame
 
-    -- Name
-    local NameLabel = Instance.new("TextLabel")
-    NameLabel.Size = UDim2.new(0, 150, 0, 20)
-    NameLabel.Position = UDim2.new(0, 45, 0, 5)
-    NameLabel.BackgroundTransparency = 1
-    NameLabel.Text = "Speed Value"
-    NameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NameLabel.TextSize = 13
-    NameLabel.Font = Enum.Font.GothamSemibold
-    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    NameLabel.ZIndex = 13
-    NameLabel.Parent = SliderFrame
-
-    -- Value Display
     local ValueLabel = Instance.new("TextLabel")
-    ValueLabel.Size = UDim2.new(0, 100, 0, 20)
-    ValueLabel.Position = UDim2.new(1, -110, 0, 5)
+    ValueLabel.Size = UDim2.new(0, 200, 0, 28)
+    ValueLabel.Position = UDim2.new(1, -210, 0, 0)
     ValueLabel.BackgroundTransparency = 1
-    ValueLabel.Text = "999B"
-    ValueLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-    ValueLabel.TextSize = 13
-    ValueLabel.Font = Enum.Font.GothamBold
+    ValueLabel.Text = tostring(value)
+    ValueLabel.TextColor3 = Colors.Text
+    ValueLabel.TextSize = 11
+    ValueLabel.Font = Enum.Font.Code
     ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
     ValueLabel.ZIndex = 13
-    ValueLabel.Parent = SliderFrame
+    ValueLabel.Parent = Frame
 
-    -- Slider Background
-    local SliderBg = Instance.new("Frame")
-    SliderBg.Size = UDim2.new(1, -20, 0, 8)
-    SliderBg.Position = UDim2.new(0, 10, 0, 38)
-    SliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    SliderBg.BorderSizePixel = 0
-    SliderBg.ZIndex = 13
-    SliderBg.Parent = SliderFrame
-
-    local SliderBgCorner = Instance.new("UICorner")
-    SliderBgCorner.CornerRadius = UDim.new(0, 4)
-    SliderBgCorner.Parent = SliderBg
-
-    -- Slider Fill
-    local SliderFill = Instance.new("Frame")
-    SliderFill.Size = UDim2.new(1, 0, 1, 0)
-    SliderFill.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-    SliderFill.BorderSizePixel = 0
-    SliderFill.ZIndex = 14
-    SliderFill.Parent = SliderBg
-
-    local SliderFillCorner = Instance.new("UICorner")
-    SliderFillCorner.CornerRadius = UDim.new(0, 4)
-    SliderFillCorner.Parent = SliderFill
-
-    -- Slider Knob
-    local SliderKnob = Instance.new("Frame")
-    SliderKnob.Size = UDim2.new(0, 16, 0, 16)
-    SliderKnob.Position = UDim2.new(1, -8, 0, -4)
-    SliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    SliderKnob.BorderSizePixel = 0
-    SliderKnob.ZIndex = 15
-    SliderKnob.Parent = SliderBg
-
-    local SliderKnobCorner = Instance.new("UICorner")
-    SliderKnobCorner.CornerRadius = UDim.new(1, 0)
-    SliderKnobCorner.Parent = SliderKnob
-
-    -- Preset Buttons
-    local PresetsFrame = Instance.new("Frame")
-    PresetsFrame.Size = UDim2.new(1, -20, 0, 20)
-    PresetsFrame.Position = UDim2.new(0, 10, 0, 50)
-    PresetsFrame.BackgroundTransparency = 1
-    PresetsFrame.ZIndex = 13
-    PresetsFrame.Parent = SliderFrame
-
-    local PresetsLayout = Instance.new("UIListLayout")
-    PresetsLayout.FillDirection = Enum.FillDirection.Horizontal
-    PresetsLayout.Padding = UDim.new(0, 5)
-    PresetsLayout.Parent = PresetsFrame
-
-    local presets = {
-        {name = "1M", value = 1000000},
-        {name = "1B", value = 1000000000},
-        {name = "999B", value = 999000000000},
-    }
-
-    for _, preset in pairs(presets) do
-        local PresetBtn = Instance.new("TextButton")
-        PresetBtn.Size = UDim2.new(0, 50, 0, 18)
-        PresetBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-        PresetBtn.Text = preset.name
-        PresetBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        PresetBtn.TextSize = 10
-        PresetBtn.Font = Enum.Font.GothamBold
-        PresetBtn.ZIndex = 14
-        PresetBtn.Parent = PresetsFrame
-
-        local PresetCorner = Instance.new("UICorner")
-        PresetCorner.CornerRadius = UDim.new(0, 4)
-        PresetCorner.Parent = PresetBtn
-
-        PresetBtn.MouseButton1Click:Connect(function()
-            Config.SpeedValue = preset.value
-            ValueLabel.Text = preset.name
-            TweenService:Create(SliderFill, TweenInfo.new(0.3), {
-                Size = UDim2.new(1, 0, 1, 0)
-            }):Play()
-        end)
-    end
-
-    return SliderFrame
+    return Frame, ValueLabel
 end
 
 -- ============================================================
--- BUILD UI
+-- RACE TAB CONTENT
 -- ============================================================
-CreateCategory("CORE HACKS")
-CreateToggle("Auto Clicker", "AutoClick", StartAutoClick, StopAutoClick, "👆")
-CreateToggle("Auto Race", "AutoRace", StartAutoRace, StopAutoRace, "🏁")
-CreateToggle("Speed Hack (999B)", "SpeedHack", StartSpeedHack, StopSpeedHack, "💨")
-CreateSpeedSlider()
+CreateSection(RaceContent, "Race Engine")
+CreateToggle(RaceContent, "Auto Race (Win + Speed)", "AutoRace", StartRaceEngine, StopRaceEngine)
+CreateToggle(RaceContent, "Auto Clicker", "AutoClick", function() end, function() end)
+CreateToggle(RaceContent, "Speed Hack 999B", "SpeedHack", function() end, CleanupSpeedHack)
 
-CreateCategory("FARMING")
-CreateToggle("Auto Farm Wins", "AutoFarm", StartAutoFarm, StopAutoFarm, "💰")
-CreateToggle("Auto Rebirth", "AutoRebirth", StartAutoRebirth, StopAutoRebirth, "🔄")
+CreateSection(RaceContent, "Race Settings")
+CreateToggle(RaceContent, "Anti-Fall", "AntiFall", function() end, function() end)
+CreateToggle(RaceContent, "Auto Steer", "AutoSteer", function() end, function() end)
 
-CreateCategory("PETS")
-CreateToggle("Auto Hatch Eggs", "AutoHatch", StartAutoHatch, StopAutoHatch, "🥚")
-CreateToggle("Auto Equip Best Pets", "AutoEquipBestPets", StartAutoEquip, StopAutoEquip, "🐾")
+-- Speed Presets
+local SpeedPresets = {"1M", "1B", "999B"}
+local SpeedValues = {1000000, 1000000000, 999000000000}
 
-CreateCategory("UTILITIES")
-CreateToggle("Anti-Fall + Steer", "AntiFall", StartAntiFall, StopAntiFall, "🛡️")
-CreateToggle("Speed Mods", "AntiFall", function() end, function() end, "⚡")
+local PresetFrame = Instance.new("Frame")
+PresetFrame.Size = UDim2.new(1, -10, 0, 38)
+PresetFrame.BackgroundColor3 = Colors.Panel
+PresetFrame.BorderSizePixel = 0
+PresetFrame.ZIndex = 12
+PresetFrame.Parent = RaceContent
 
-CreateCategory("ACTIONS")
-CreateActionButton("Redeem All Codes", RedeemAllCodes, "🎫", Color3.fromRGB(100, 50, 200))
-CreateActionButton("Teleport Best World", TeleportToBestWorld, "🌍", Color3.fromRGB(50, 100, 200))
+local PresetStroke = Instance.new("UIStroke")
+PresetStroke.Color = Colors.Border
+PresetStroke.Thickness = 1
+PresetStroke.Parent = PresetFrame
+
+local PresetLabel = Instance.new("TextLabel")
+PresetLabel.Size = UDim2.new(0, 100, 0, 38)
+PresetLabel.Position = UDim2.new(0, 12, 0, 0)
+PresetLabel.BackgroundTransparency = 1
+PresetLabel.Text = "> SPEED:"
+PresetLabel.TextColor3 = Colors.Text
+PresetLabel.TextSize = 12
+PresetLabel.Font = Enum.Font.Code
+PresetLabel.TextXAlignment = Enum.TextXAlignment.Left
+PresetLabel.ZIndex = 13
+PresetLabel.Parent = PresetFrame
+
+for i, preset in ipairs(SpeedPresets) do
+    local PresetBtn = Instance.new("TextButton")
+    PresetBtn.Size = UDim2.new(0, 50, 0, 24)
+    PresetBtn.Position = UDim2.new(0, 80 + (i * 55), 0, 7)
+    PresetBtn.BackgroundColor3 = Colors.PanelHover
+    PresetBtn.Text = preset
+    PresetBtn.TextColor3 = Colors.TextDim
+    PresetBtn.TextSize = 10
+    PresetBtn.Font = Enum.Font.Code
+    PresetBtn.AutoButtonColor = false
+    PresetBtn.ZIndex = 13
+    PresetBtn.Parent = PresetFrame
+
+    local PresetBtnStroke = Instance.new("UIStroke")
+    PresetBtnStroke.Color = Colors.Border
+    PresetBtnStroke.Thickness = 1
+    PresetBtnStroke.Parent = PresetBtn
+
+    PresetBtn.MouseButton1Click:Connect(function()
+        Config.SpeedValue = SpeedValues[i]
+        Notify("SPEED", "Set to " .. preset)
+    end)
+
+    PresetBtn.MouseEnter:Connect(function()
+        TweenService:Create(PresetBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(35, 35, 40)}):Play()
+    end)
+
+    PresetBtn.MouseLeave:Connect(function()
+        TweenService:Create(PresetBtn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.PanelHover}):Play()
+    end)
+end
 
 -- ============================================================
--- BOTTOM INFO
+-- MISC TAB CONTENT
 -- ============================================================
-local BottomFrame = Instance.new("Frame")
-BottomFrame.Size = UDim2.new(1, -20, 0, 30)
-BottomFrame.Position = UDim2.new(0, 10, 1, -35)
-BottomFrame.BackgroundTransparency = 1
-BottomFrame.ZIndex = 11
-BottomFrame.Parent = MainFrame
+CreateSection(MiscContent, "Farming")
+CreateToggle(MiscContent, "Auto Farm Wins", "AutoFarm", StartAutoFarm, StopAutoFarm)
+CreateToggle(MiscContent, "Auto Rebirth", "AutoRebirth", StartAutoRebirth, StopAutoRebirth)
+
+CreateSection(MiscContent, "Pets")
+CreateToggle(MiscContent, "Auto Hatch Eggs", "AutoHatch", StartAutoHatch, StopAutoHatch)
+CreateToggle(MiscContent, "Auto Equip Best", "AutoEquipBestPets", StartAutoEquip, StopAutoEquip)
+
+CreateSection(MiscContent, "Actions")
+CreateActionButton(MiscContent, "Redeem All Codes", RedeemAllCodes, Colors.Text)
+CreateActionButton(MiscContent, "Teleport Best World", TeleportToBestWorld, Colors.Text)
+
+CreateSection(MiscContent, "Movement")
+CreateToggle(MiscContent, "Speed Mods (Walk/Jump)", "AntiFall", StartSpeedMods, function()
+    if SpeedModConnection then SpeedModConnection:Disconnect() end
+end)
+
+-- ============================================================
+-- PROFILE TAB CONTENT
+-- ============================================================
+CreateSection(ProfileContent, "Player Stats")
+
+local WinsLine, WinsValue = CreateInfoLine(ProfileContent, "WINS", "0")
+local RebirthLine, RebirthValue = CreateInfoLine(ProfileContent, "REBIRTHS", "0")
+local SpeedLine, SpeedValue = CreateInfoLine(ProfileContent, "SPEED", "0")
+local WorldLine, WorldValue = CreateInfoLine(ProfileContent, "WORLD", "1")
+
+CreateSection(ProfileContent, "System Info")
+CreateInfoLine(ProfileContent, "EXECUTOR", identifyexecutor and identifyexecutor() or "UNKNOWN")
+CreateInfoLine(ProfileContent, "VERSION", "v4.0")
+CreateInfoLine(ProfileContent, "DEVELOPER", "@XyrooXellz")
+
+-- Update stats loop
+spawn(function()
+    while task.wait(1) do
+        UpdateGameState()
+        pcall(function()
+            WinsValue.Text = tostring(GameState.Wins)
+            RebirthValue.Text = tostring(GameState.Rebirths)
+            SpeedValue.Text = tostring(GameState.Speed)
+            WorldValue.Text = tostring(GameState.CurrentWorld)
+        end)
+    end
+end)
+
+-- ============================================================
+-- BOTTOM BAR
+-- ============================================================
+local BottomBar = Instance.new("Frame")
+BottomBar.Size = UDim2.new(1, 0, 0, 24)
+BottomBar.Position = UDim2.new(0, 0, 1, -24)
+BottomBar.BackgroundColor3 = Colors.Panel
+BottomBar.BorderSizePixel = 0
+BottomBar.ZIndex = 11
+BottomBar.Parent = MainFrame
+
+local BottomStroke = Instance.new("UIStroke")
+BottomStroke.Color = Colors.Border
+BottomStroke.Thickness = 1
+BottomStroke.Parent = BottomBar
 
 local BottomText = Instance.new("TextLabel")
 BottomText.Size = UDim2.new(1, 0, 1, 0)
 BottomText.BackgroundTransparency = 1
-BottomText.Text = "Race Clicker Cheat v3.0 | @XyrooXellz | Press RightCtrl to toggle"
-BottomText.TextColor3 = Color3.fromRGB(100, 100, 120)
-BottomText.TextSize = 10
-BottomText.Font = Enum.Font.Gotham
+BottomText.Text = "[RIGHT_CTRL] TOGGLE | [X] CLOSE | [−] MINIMIZE | v4.0"
+BottomText.TextColor3 = Colors.TextDim
+BottomText.TextSize = 9
+BottomText.Font = Enum.Font.Code
 BottomText.ZIndex = 12
-BottomText.Parent = BottomFrame
+BottomText.Parent = BottomBar
 
 -- ============================================================
--- ANIMATIONS
+-- ANIMATIONS & CONTROLS
 -- ============================================================
--- Entry animation
+-- Entry
 MainFrame.Size = UDim2.new(0, 0, 0, 0)
 MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 MainFrame.Visible = false
 
--- Play loading then show main
 spawn(function()
-    PlayLoadingAnimation()
+    PlayBootSequence()
 
     MainFrame.Visible = true
-    TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 380, 0, 520),
-        Position = UDim2.new(0.5, -190, 0.5, -260)
+    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 420, 0, 540),
+        Position = UDim2.new(0.5, -210, 0.5, -270)
     }):Play()
 
-    TweenService:Create(Blur, TweenInfo.new(0.5), {Size = 10}):Play()
+    TweenService:Create(Blur, TweenInfo.new(0.4), {Size = 8}):Play()
 end)
 
--- Close button
+-- Close
 CloseBtn.MouseButton1Click:Connect(function()
     TweenService:Create(MainFrame, TweenInfo.new(0.3), {
         Size = UDim2.new(0, 0, 0, 0),
         Position = UDim2.new(0.5, 0, 0.5, 0)
     }):Play()
-
     TweenService:Create(Blur, TweenInfo.new(0.3), {Size = 0}):Play()
 
     task.wait(0.3)
     ScreenGui:Destroy()
     Blur:Destroy()
 
-    -- Cleanup
-    StopAutoClick()
-    StopAutoRace()
-    StopSpeedHack()
+    StopRaceEngine()
     StopAutoFarm()
     StopAutoRebirth()
     StopAutoHatch()
     StopAutoEquip()
-    StopAntiFall()
+    CleanupSpeedHack()
     if SpeedModConnection then SpeedModConnection:Disconnect() end
 end)
 
@@ -1533,35 +1343,55 @@ local minimized = false
 MinBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     if minimized then
-        TweenService:Create(ContentFrame, TweenInfo.new(0.3), {Size = UDim2.new(1, -20, 0, 0)}):Play()
-        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 380, 0, 60)}):Play()
-        MinIcon.Text = "+"
+        for _, content in pairs(TabContents) do
+            content.Visible = false
+        end
+        TabBar.Visible = false
+        BottomBar.Visible = false
+        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 420, 0, 36)}):Play()
     else
-        TweenService:Create(ContentFrame, TweenInfo.new(0.3), {Size = UDim2.new(1, -20, 1, -110)}):Play()
-        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 380, 0, 520)}):Play()
-        MinIcon.Text = "−"
+        TabBar.Visible = true
+        BottomBar.Visible = true
+        TabContents[CurrentTab].Visible = true
+        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 420, 0, 540)}):Play()
     end
 end)
 
--- Keybind toggle
+-- Keybind
 UserInputService.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.RightControl then
         MainFrame.Visible = not MainFrame.Visible
         if MainFrame.Visible then
-            TweenService:Create(Blur, TweenInfo.new(0.3), {Size = 10}):Play()
+            TweenService:Create(Blur, TweenInfo.new(0.3), {Size = 8}):Play()
         else
             TweenService:Create(Blur, TweenInfo.new(0.3), {Size = 0}):Play()
         end
     end
 end)
 
+-- Hover effects for title bar buttons
+CloseBtn.MouseEnter:Connect(function()
+    TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(80, 30, 30)}):Play()
+end)
+CloseBtn.MouseLeave:Connect(function()
+    TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.Panel}):Play()
+end)
+
+MinBtn.MouseEnter:Connect(function()
+    TweenService:Create(MinBtn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.PanelHover}):Play()
+end)
+MinBtn.MouseLeave:Connect(function()
+    TweenService:Create(MinBtn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.Panel}):Play()
+end)
+
 -- ============================================================
--- AUTO INIT
+-- INIT
 -- ============================================================
 StartSpeedMods()
 
-Notify("🏁 Race Clicker Cheat", "v3.0 by @XyrooXellz loaded! Press RightCtrl to toggle UI")
+Notify("XYROOXELLZ", "Race Clicker v4.0 loaded | Press RightCtrl")
 
-print("[Race Clicker Cheat v3.0] Loaded successfully!")
-print("[Race Clicker Cheat v3.0] Developer: @XyrooXellz")
-print("[Race Clicker Cheat v3.0] Press Right Ctrl to toggle GUI")
+print("[XYROOXELLZ] Race Clicker Cheat v4.0")
+print("[XYROOXELLZ] Terminal Style: Micro Black & White")
+print("[XYROOXELLZ] Developer: @XyrooXellz")
+print("[XYROOXELLZ] Press Right Ctrl to toggle")
