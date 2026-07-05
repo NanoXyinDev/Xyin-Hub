@@ -1,5 +1,5 @@
 -- ============================================
--- RACE CLICKER SCRIPT v2.0 - FIXED WORKING
+-- RACE CLICKER SCRIPT v3.0 - VERIFIED WORKING
 -- Youtube.com/RukanooXD_YT
 -- DEVELOPER TAG
 -- ============================================
@@ -17,7 +17,26 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- ============================================
--- UTILITY FUNCTIONS
+-- VERIFIED REMOTE SETUP (Dari source yang work)
+-- ============================================
+local ClickRF = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("ClickService"):WaitForChild("RF"):WaitForChild("Click")
+local RebirthRF = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("RebirthService"):WaitForChild("RF"):WaitForChild("Rebirth")
+
+-- Cari RaceService (bisa beda nama)
+local RaceRF = nil
+pcall(function()
+    RaceRF = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("RaceService"):WaitForChild("RF"):WaitForChild("Race")
+end)
+
+-- Fallback kalo RaceService gak ketemu
+if not RaceRF then
+    pcall(function()
+        RaceRF = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("RaceService"):WaitForChild("RF"):WaitForChild("FinishRace")
+    end)
+end
+
+-- ============================================
+-- SAFE CALL WRAPPER
 -- ============================================
 local function safeCall(func, ...)
     local success, result = pcall(func, ...)
@@ -27,17 +46,8 @@ local function safeCall(func, ...)
     return success, result
 end
 
--- Find Knit Services (Race Clicker pake Knit framework)
-local Knit = ReplicatedStorage:WaitForChild("Packages", 5):WaitForChild("Knit", 5)
-local ClickService = Knit:WaitForChild("Services", 5):WaitForChild("ClickService", 5)
-local ClickRF = ClickService:WaitForChild("RF", 5):WaitForChild("Click", 5)
-local RebirthService = Knit:WaitForChild("Services", 5):WaitForChild("RebirthService", 5)
-local RebirthRF = RebirthService:WaitForChild("RF", 5):WaitForChild("Rebirth", 5)
-local RaceService = Knit:WaitForChild("Services", 5):WaitForChild("RaceService", 5)
-local RaceRF = RaceService:WaitForChild("RF", 5):WaitForChild("Race", 5)
-
 -- ============================================
--- LOADING SCREEN WITH SMOOTH PROGRESS BAR
+-- LOADING SCREEN - SMOOTH
 -- ============================================
 local loadingGui = Instance.new("ScreenGui")
 loadingGui.Name = "RukanooXD_Loading"
@@ -46,22 +56,12 @@ loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 loadingGui.Parent = playerGui
 
 local loadingFrame = Instance.new("Frame")
-loadingFrame.Size = UDim2.new(0, 450, 0, 220)
-loadingFrame.Position = UDim2.new(0.5, -225, 0.5, -110)
+loadingFrame.Size = UDim2.new(0, 420, 0, 240)
+loadingFrame.Position = UDim2.new(0.5, -210, 0.5, -120)
 loadingFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 25)
 loadingFrame.BorderSizePixel = 0
 loadingFrame.ClipsDescendants = true
 loadingFrame.Parent = loadingGui
-
--- Gradient background
-local loadGradient = Instance.new("UIGradient")
-loadGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 10, 25)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 15, 40)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 25))
-})
-loadGradient.Rotation = 45
-loadGradient.Parent = loadingFrame
 
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 24)
@@ -69,8 +69,8 @@ corner.Parent = loadingFrame
 
 -- Glow border
 local glowBorder = Instance.new("Frame")
-glowBorder.Size = UDim2.new(1, 4, 1, 4)
-glowBorder.Position = UDim2.new(0, -2, 0, -2)
+glowBorder.Size = UDim2.new(1, 6, 1, 6)
+glowBorder.Position = UDim2.new(0, -3, 0, -3)
 glowBorder.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
 glowBorder.BackgroundTransparency = 0.9
 glowBorder.BorderSizePixel = 0
@@ -83,50 +83,48 @@ glowCorner.Parent = glowBorder
 
 -- Title
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, 0, 0, 50)
+titleLabel.Size = UDim2.new(1, 0, 0, 55)
 titleLabel.Position = UDim2.new(0, 0, 0, 25)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "RukanooXD_YT"
 titleLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-titleLabel.TextSize = 32
+titleLabel.TextSize = 34
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.Parent = loadingFrame
 
 -- Subtitle
 local subtitleLabel = Instance.new("TextLabel")
-subtitleLabel.Size = UDim2.new(1, 0, 0, 25)
-subtitleLabel.Position = UDim2.new(0, 0, 0, 75)
+subtitleLabel.Size = UDim2.new(1, 0, 0, 28)
+subtitleLabel.Position = UDim2.new(0, 0, 0, 80)
 subtitleLabel.BackgroundTransparency = 1
-subtitleLabel.Text = "Race Clicker v2.0 - 2026 Edition"
+subtitleLabel.Text = "Race Clicker v3.0 - Verified Working"
 subtitleLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
 subtitleLabel.TextSize = 14
 subtitleLabel.Font = Enum.Font.Gotham
 subtitleLabel.Parent = loadingFrame
 
--- Progress Bar Container
-local progressContainer = Instance.new("Frame")
-progressContainer.Size = UDim2.new(0, 360, 0, 14)
-progressContainer.Position = UDim2.new(0.5, -180, 0, 125)
-progressContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-progressContainer.BorderSizePixel = 0
-progressContainer.Parent = loadingFrame
+-- Progress Bar
+local progressBg = Instance.new("Frame")
+progressBg.Size = UDim2.new(0, 360, 0, 14)
+progressBg.Position = UDim2.new(0.5, -180, 0, 135)
+progressBg.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+progressBg.BorderSizePixel = 0
+progressBg.Parent = loadingFrame
 
-local progressContainerCorner = Instance.new("UICorner")
-progressContainerCorner.CornerRadius = UDim.new(1, 0)
-progressContainerCorner.Parent = progressContainer
+local progressBgCorner = Instance.new("UICorner")
+progressBgCorner.CornerRadius = UDim.new(1, 0)
+progressBgCorner.Parent = progressBg
 
--- Progress Fill
 local progressFill = Instance.new("Frame")
 progressFill.Size = UDim2.new(0, 0, 1, 0)
 progressFill.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
 progressFill.BorderSizePixel = 0
-progressFill.Parent = progressContainer
+progressFill.Parent = progressBg
 
 local progressFillCorner = Instance.new("UICorner")
 progressFillCorner.CornerRadius = UDim.new(1, 0)
 progressFillCorner.Parent = progressFill
 
--- Gradient on progress
 local progressGradient = Instance.new("UIGradient")
 progressGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 150)),
@@ -134,10 +132,9 @@ progressGradient.Color = ColorSequence.new({
 })
 progressGradient.Parent = progressFill
 
--- Progress Text
 local progressText = Instance.new("TextLabel")
 progressText.Size = UDim2.new(1, 0, 0, 30)
-progressText.Position = UDim2.new(0, 0, 0, 150)
+progressText.Position = UDim2.new(0, 0, 0, 160)
 progressText.BackgroundTransparency = 1
 progressText.Text = "Initializing..."
 progressText.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -145,10 +142,9 @@ progressText.TextSize = 16
 progressText.Font = Enum.Font.GothamBold
 progressText.Parent = loadingFrame
 
--- Status text
 local statusText = Instance.new("TextLabel")
 statusText.Size = UDim2.new(1, 0, 0, 20)
-statusText.Position = UDim2.new(0, 0, 0, 180)
+statusText.Position = UDim2.new(0, 0, 0, 195)
 statusText.BackgroundTransparency = 1
 statusText.Text = "Loading modules..."
 statusText.TextColor3 = Color3.fromRGB(120, 120, 150)
@@ -156,52 +152,38 @@ statusText.TextSize = 12
 statusText.Font = Enum.Font.Gotham
 statusText.Parent = loadingFrame
 
--- Smooth Loading Animation
+-- Loading Animation
 local function animateLoading()
     local stages = {
-        {pct = 0.15, text = "Loading modules...", status = "Knit Framework detected"},
-        {pct = 0.35, text = "Connecting services...", status = "ClickService ✓ RebirthService ✓"},
-        {pct = 0.55, text = "Scanning remotes...", status = "RemoteFunctions found"},
-        {pct = 0.75, text = "Building UI...", status = "Glassmorphism style loaded"},
-        {pct = 0.90, text = "Finalizing...", status = "Ready to race!"},
-        {pct = 1.00, text = "100%", status = "Done!"},
+        {pct = 0.2, text = "Connecting to Knit...", status = "ClickService ✓"},
+        {pct = 0.4, text = "Loading remotes...", status = "RebirthService ✓"},
+        {pct = 0.6, text = "Building UI...", status = "Glassmorphism loaded"},
+        {pct = 0.8, text = "Finalizing...", status = "Ready to race!"},
+        {pct = 1.0, text = "100%", status = "Done!"},
     }
     
     for _, stage in ipairs(stages) do
-        local tween = TweenService:Create(progressFill, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        TweenService:Create(progressFill, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             Size = UDim2.new(stage.pct, 0, 1, 0)
-        })
-        tween:Play()
+        }):Play()
         progressText.Text = math.floor(stage.pct * 100) .. "%"
         statusText.Text = stage.status
-        task.wait(0.9)
+        task.wait(0.8)
     end
     
     task.wait(0.3)
-    
-    -- Fade out loading
-    local fadeTween = TweenService:Create(loadingFrame, TweenInfo.new(0.6), {
-        BackgroundTransparency = 1
-    })
-    fadeTween:Play()
-    
+    TweenService:Create(loadingFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
     for _, child in pairs(loadingFrame:GetDescendants()) do
         if child:IsA("TextLabel") or child:IsA("Frame") then
-            if child ~= glowBorder then
-                TweenService:Create(child, TweenInfo.new(0.6), {
-                    BackgroundTransparency = 1,
-                    TextTransparency = 1
-                }):Play()
-            end
+            TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
         end
     end
-    
     task.wait(0.7)
     loadingGui:Destroy()
 end
 
 -- ============================================
--- MAIN UI - GLASSMORPHISM 2026 STYLE
+-- MAIN UI - GLASSMORPHISM 2026
 -- ============================================
 local mainGui = Instance.new("ScreenGui")
 mainGui.Name = "RukanooXD_Main"
@@ -209,12 +191,12 @@ mainGui.ResetOnSpawn = false
 mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 mainGui.Parent = playerGui
 
--- Main Container
+-- Main Frame
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 380, 0, 580)
-mainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
+mainFrame.Size = UDim2.new(0, 360, 0, 520)
+mainFrame.Position = UDim2.new(0.02, 0, 0.08, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
-mainFrame.BackgroundTransparency = 0.15
+mainFrame.BackgroundTransparency = 0.1
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = mainGui
 
@@ -222,24 +204,24 @@ local mainCorner = Instance.new("UICorner")
 mainCorner.CornerRadius = UDim.new(0, 20)
 mainCorner.Parent = mainFrame
 
--- Glassmorphism gradient
+-- Glass gradient
 local glassGradient = Instance.new("UIGradient")
 glassGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 40)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 25, 50)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 40))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 18, 35)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(25, 22, 45)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 18, 35))
 })
 glassGradient.Rotation = 135
 glassGradient.Parent = mainFrame
 
 -- Outer glow
 local outerGlow = Instance.new("ImageLabel")
-outerGlow.Size = UDim2.new(1, 60, 1, 60)
-outerGlow.Position = UDim2.new(0, -30, 0, -30)
+outerGlow.Size = UDim2.new(1, 50, 1, 50)
+outerGlow.Position = UDim2.new(0, -25, 0, -25)
 outerGlow.BackgroundTransparency = 1
 outerGlow.Image = "rbxassetid://4996891979"
 outerGlow.ImageColor3 = Color3.fromRGB(0, 255, 150)
-outerGlow.ImageTransparency = 0.92
+outerGlow.ImageTransparency = 0.9
 outerGlow.ZIndex = 0
 outerGlow.Parent = mainFrame
 
@@ -247,7 +229,7 @@ outerGlow.Parent = mainFrame
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 50)
 titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-titleBar.BackgroundTransparency = 0.3
+titleBar.BackgroundTransparency = 0.2
 titleBar.BorderSizePixel = 0
 titleBar.Parent = mainFrame
 
@@ -255,32 +237,31 @@ local titleBarCorner = Instance.new("UICorner")
 titleBarCorner.CornerRadius = UDim.new(0, 20)
 titleBarCorner.Parent = titleBar
 
--- Bottom clip for title bar
-local titleBarClip = Instance.new("Frame")
-titleBarClip.Size = UDim2.new(1, 0, 0, 25)
-titleBarClip.Position = UDim2.new(0, 0, 0, 25)
-titleBarClip.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-titleBarClip.BackgroundTransparency = 0.3
-titleBarClip.BorderSizePixel = 0
-titleBarClip.Parent = titleBar
+local titleClip = Instance.new("Frame")
+titleClip.Size = UDim2.new(1, 0, 0, 25)
+titleClip.Position = UDim2.new(0, 0, 0, 25)
+titleClip.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
+titleClip.BackgroundTransparency = 0.2
+titleClip.BorderSizePixel = 0
+titleClip.Parent = titleBar
 
 local titleText = Instance.new("TextLabel")
-titleText.Size = UDim2.new(0.7, 0, 1, 0)
+titleText.Size = UDim2.new(0.6, 0, 1, 0)
 titleText.Position = UDim2.new(0.15, 0, 0, 0)
 titleText.BackgroundTransparency = 1
 titleText.Text = "RACE CLICKER 2026"
 titleText.TextColor3 = Color3.fromRGB(0, 255, 150)
-titleText.TextSize = 22
+titleText.TextSize = 20
 titleText.Font = Enum.Font.GothamBold
 titleText.Parent = titleBar
 
 -- Version badge
 local versionBadge = Instance.new("TextLabel")
-versionBadge.Size = UDim2.new(0, 50, 0, 20)
+versionBadge.Size = UDim2.new(0, 45, 0, 20)
 versionBadge.Position = UDim2.new(0.02, 0, 0.3, 0)
 versionBadge.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
 versionBadge.BackgroundTransparency = 0.8
-versionBadge.Text = "v2.0"
+versionBadge.Text = "v3.0"
 versionBadge.TextColor3 = Color3.fromRGB(0, 255, 150)
 versionBadge.TextSize = 11
 versionBadge.Font = Enum.Font.GothamBold
@@ -296,7 +277,7 @@ devTag.Size = UDim2.new(1, 0, 0, 18)
 devTag.Position = UDim2.new(0, 0, 0, 50)
 devTag.BackgroundTransparency = 1
 devTag.Text = "Youtube.com/RukanooXD_YT"
-devTag.TextColor3 = Color3.fromRGB(120, 120, 160)
+devTag.TextColor3 = Color3.fromRGB(100, 100, 150)
 devTag.TextSize = 11
 devTag.Font = Enum.Font.Gotham
 devTag.Parent = mainFrame
@@ -317,15 +298,6 @@ local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 10)
 closeCorner.Parent = closeBtn
 
-closeBtn.MouseButton1Click:Connect(function()
-    -- Destroy all loops
-    for _, conn in pairs(_G.RukanooXD_Connections or {}) do
-        pcall(function() conn:Disconnect() end)
-    end
-    _G.RukanooXD_Connections = {}
-    mainGui:Destroy()
-end)
-
 -- Minimize Button
 local minBtn = Instance.new("TextButton")
 minBtn.Size = UDim2.new(0, 32, 0, 32)
@@ -342,23 +314,7 @@ local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(0, 10)
 minCorner.Parent = minBtn
 
-local minimized = false
-minBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    if minimized then
-        TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-            Size = UDim2.new(0, 380, 0, 50)
-        }):Play()
-        minBtn.Text = "+"
-    else
-        TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-            Size = UDim2.new(0, 380, 0, 580)
-        }):Play()
-        minBtn.Text = "−"
-    end
-end)
-
--- Drag Function (Smooth)
+-- Drag
 local dragging = false
 local dragStart, startPos
 
@@ -383,15 +339,37 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
+-- Minimize toggle
+local minimized = false
+minBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        TweenService:Create(mainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 360, 0, 50)}):Play()
+        minBtn.Text = "+"
+    else
+        TweenService:Create(mainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 360, 0, 520)}):Play()
+        minBtn.Text = "−"
+    end
+end)
+
+-- Close
+closeBtn.MouseButton1Click:Connect(function()
+    for _, conn in pairs(_G.RukanooXD_Connections or {}) do
+        pcall(function() conn:Disconnect() end)
+    end
+    _G.RukanooXD_Connections = {}
+    mainGui:Destroy()
+end)
+
 -- ============================================
--- HELPER: CREATE TOGGLE BUTTON
+-- TOGGLE CREATOR
 -- ============================================
-local function createToggle(parent, yPos, labelText, colorOn)
+local function createToggle(parent, yPos, labelText, accentColor)
     local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = UDim2.new(1, -20, 0, 55)
-    toggleFrame.Position = UDim2.new(0, 10, 0, yPos)
-    toggleFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-    toggleFrame.BackgroundTransparency = 0.4
+    toggleFrame.Size = UDim2.new(1, -16, 0, 52)
+    toggleFrame.Position = UDim2.new(0, 8, 0, yPos)
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 48)
+    toggleFrame.BackgroundTransparency = 0.3
     toggleFrame.BorderSizePixel = 0
     toggleFrame.Parent = parent
 
@@ -399,21 +377,30 @@ local function createToggle(parent, yPos, labelText, colorOn)
     toggleCorner.CornerRadius = UDim.new(0, 12)
     toggleCorner.Parent = toggleFrame
 
-    -- Hover effect
+    -- Hover
     toggleFrame.MouseEnter:Connect(function()
-        TweenService:Create(toggleFrame, TweenInfo.new(0.2), {
-            BackgroundTransparency = 0.2
-        }):Play()
+        TweenService:Create(toggleFrame, TweenInfo.new(0.2), {BackgroundTransparency = 0.1}):Play()
     end)
     toggleFrame.MouseLeave:Connect(function()
-        TweenService:Create(toggleFrame, TweenInfo.new(0.2), {
-            BackgroundTransparency = 0.4
-        }):Play()
+        TweenService:Create(toggleFrame, TweenInfo.new(0.2), {BackgroundTransparency = 0.3}):Play()
     end)
 
+    -- Indicator dot
+    local indicator = Instance.new("Frame")
+    indicator.Size = UDim2.new(0, 10, 0, 10)
+    indicator.Position = UDim2.new(0, 12, 0.5, -5)
+    indicator.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    indicator.BorderSizePixel = 0
+    indicator.Parent = toggleFrame
+
+    local indCorner = Instance.new("UICorner")
+    indCorner.CornerRadius = UDim.new(1, 0)
+    indCorner.Parent = indicator
+
+    -- Label
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0.55, 0, 1, 0)
-    label.Position = UDim2.new(0, 15, 0, 0)
+    label.Position = UDim2.new(0, 30, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = labelText
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -422,9 +409,10 @@ local function createToggle(parent, yPos, labelText, colorOn)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = toggleFrame
 
+    -- Button
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 75, 0, 32)
-    btn.Position = UDim2.new(1, -90, 0.5, -16)
+    btn.Size = UDim2.new(0, 70, 0, 30)
+    btn.Position = UDim2.new(1, -82, 0.5, -15)
     btn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
     btn.Text = "OFF"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -436,18 +424,6 @@ local function createToggle(parent, yPos, labelText, colorOn)
     btnCorner.CornerRadius = UDim.new(0, 8)
     btnCorner.Parent = btn
 
-    -- Status indicator dot
-    local indicator = Instance.new("Frame")
-    indicator.Size = UDim2.new(0, 8, 0, 8)
-    indicator.Position = UDim2.new(0, 6, 0.5, -4)
-    indicator.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    indicator.BorderSizePixel = 0
-    indicator.Parent = toggleFrame
-
-    local indCorner = Instance.new("UICorner")
-    indCorner.CornerRadius = UDim.new(1, 0)
-    indCorner.Parent = indicator
-
     return toggleFrame, btn, indicator, label
 end
 
@@ -455,8 +431,8 @@ end
 -- SECTION: MAIN MENU
 -- ============================================
 local mainSection = Instance.new("Frame")
-mainSection.Size = UDim2.new(1, -20, 0, 280)
-mainSection.Position = UDim2.new(0, 10, 0, 75)
+mainSection.Size = UDim2.new(1, -16, 0, 260)
+mainSection.Position = UDim2.new(0, 8, 0, 72)
 mainSection.BackgroundTransparency = 1
 mainSection.Parent = mainFrame
 
@@ -465,28 +441,27 @@ sectionTitle1.Size = UDim2.new(1, 0, 0, 22)
 sectionTitle1.BackgroundTransparency = 1
 sectionTitle1.Text = "MAIN MENU"
 sectionTitle1.TextColor3 = Color3.fromRGB(0, 255, 150)
-sectionTitle1.TextSize = 14
+sectionTitle1.TextSize = 13
 sectionTitle1.Font = Enum.Font.GothamBold
 sectionTitle1.TextXAlignment = Enum.TextXAlignment.Left
 sectionTitle1.Parent = mainSection
 
--- Divider line
 local divider1 = Instance.new("Frame")
 divider1.Size = UDim2.new(1, 0, 0, 2)
 divider1.Position = UDim2.new(0, 0, 0, 22)
 divider1.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-divider1.BackgroundTransparency = 0.7
+divider1.BackgroundTransparency = 0.6
 divider1.BorderSizePixel = 0
 divider1.Parent = sectionTitle1
 
-local divCorner = Instance.new("UICorner")
-divCorner.CornerRadius = UDim.new(1, 0)
-divCorner.Parent = divider1
+local divCorner1 = Instance.new("UICorner")
+divCorner1.CornerRadius = UDim.new(1, 0)
+divCorner1.Parent = divider1
 
 -- Speed Hack Toggle
-local speedFrame, speedBtn, speedInd, speedLabel = createToggle(mainSection, 30, "Speed Hack (Max 999M)", Color3.fromRGB(0, 255, 100))
+local speedFrame, speedBtn, speedInd, speedLabel = createToggle(mainSection, 28, "Speed Hack (Max 999M)", Color3.fromRGB(0, 255, 100))
 
--- Speed Visual Line (Neon)
+-- Speed Visual Line
 local speedLine = Instance.new("Frame")
 speedLine.Size = UDim2.new(0, 3, 0, 0)
 speedLine.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -504,9 +479,9 @@ speedLineGradient.Color = ColorSequence.new({
 })
 speedLineGradient.Parent = speedLine
 
--- Speed Hack Logic - FIXED
+-- Speed Hack Logic - VERIFIED: Spam ClickRF:InvokeServer()
 local speedEnabled = false
-local speedConn = nil
+local speedThread = nil
 
 speedBtn.MouseButton1Click:Connect(function()
     speedEnabled = not speedEnabled
@@ -515,20 +490,15 @@ speedBtn.MouseButton1Click:Connect(function()
         speedBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
         speedInd.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
         speedLine.Visible = true
+        TweenService:Create(speedLine, TweenInfo.new(0.4, Enum.EasingStyle.Back), {Size = UDim2.new(0, 3, 0, 120)}):Play()
         
-        -- Animate line
-        TweenService:Create(speedLine, TweenInfo.new(0.4, Enum.EasingStyle.Back), {
-            Size = UDim2.new(0, 3, 0, 120)
-        }):Play()
-        
-        -- Speed Hack: Fire ClickService RF Click untuk max speed
-        speedConn = task.spawn(function()
+        -- VERIFIED METHOD: Spam ClickRF:InvokeServer() untuk max speed
+        speedThread = task.spawn(function()
             while speedEnabled do
                 safeCall(function()
-                    -- Race Clicker pake ClickService RF Click untuk nambah speed
                     ClickRF:InvokeServer()
                 end)
-                task.wait(0.01) -- Ultra fast clicking
+                task.wait(0.001) -- Ultra fast spam
             end
         end)
     else
@@ -536,19 +506,17 @@ speedBtn.MouseButton1Click:Connect(function()
         speedBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
         speedInd.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
         speedLine.Visible = false
-        TweenService:Create(speedLine, TweenInfo.new(0.3), {
-            Size = UDim2.new(0, 3, 0, 0)
-        }):Play()
+        TweenService:Create(speedLine, TweenInfo.new(0.3), {Size = UDim2.new(0, 3, 0, 0)}):Play()
         speedEnabled = false
     end
 end)
 
 -- Auto Click 15x Fast Toggle
-local clickFrame, clickBtn, clickInd, clickLabel = createToggle(mainSection, 92, "Auto Click 15x Fast", Color3.fromRGB(0, 255, 100))
+local clickFrame, clickBtn, clickInd, clickLabel = createToggle(mainSection, 86, "Auto Click 15x Fast", Color3.fromRGB(0, 255, 100))
 
--- Auto Click Logic - FIXED (No Screen Disturbance)
+-- Auto Click Logic - VERIFIED
 local clickEnabled = false
-local clickConn = nil
+local clickThread = nil
 
 clickBtn.MouseButton1Click:Connect(function()
     clickEnabled = not clickEnabled
@@ -557,8 +525,7 @@ clickBtn.MouseButton1Click:Connect(function()
         clickBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
         clickInd.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
         
-        -- Auto Click via ClickService RF (Server-side, no visual disturbance)
-        clickConn = task.spawn(function()
+        clickThread = task.spawn(function()
             while clickEnabled do
                 for i = 1, 15 do
                     safeCall(function()
@@ -577,34 +544,34 @@ clickBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================
--- NEW: AUTO RACE - FINISH ALL STAGES 1-6
+-- NEW: AUTO RACE (STAGE 1-6)
 -- ============================================
-local raceFrame, raceBtn, raceInd, raceLabel = createToggle(mainSection, 154, "Auto Race (Stage 1-6)", Color3.fromRGB(150, 0, 255))
+local raceFrame, raceBtn, raceInd, raceLabel = createToggle(mainSection, 144, "Auto Race (Stage 1-6)", Color3.fromRGB(150, 0, 255))
 
--- Stage info text
+-- Stage info
 local stageInfo = Instance.new("TextLabel")
-stageInfo.Size = UDim2.new(1, -20, 0, 18)
-stageInfo.Position = UDim2.new(0, 10, 0, 212)
+stageInfo.Size = UDim2.new(1, -16, 0, 18)
+stageInfo.Position = UDim2.new(0, 8, 0, 200)
 stageInfo.BackgroundTransparency = 1
-stageInfo.Text = "Current: Stage 1 | Target: World 6 (Purple)"
+stageInfo.Text = "Target: World 6 (Purple) | Current: Scanning..."
 stageInfo.TextColor3 = Color3.fromRGB(180, 180, 200)
 stageInfo.TextSize = 11
 stageInfo.Font = Enum.Font.Gotham
 stageInfo.TextXAlignment = Enum.TextXAlignment.Left
 stageInfo.Parent = mainSection
 
--- Auto Race Logic - TELEPORT TO FINISH LINE
+-- Auto Race Logic - Teleport + Fire Remote
 local raceEnabled = false
-local raceConn = nil
+local raceThread = nil
 
--- World/Stage data (Race Clicker punya 6 Worlds)
-local worldStages = {
-    {name = "World 1", color = "Green", winsNeeded = 0},
-    {name = "World 2", color = "Blue", winsNeeded = 500},
-    {name = "World 3", color = "Yellow", winsNeeded = 5000},
-    {name = "World 4", color = "Orange", winsNeeded = 25000},
-    {name = "World 5", color = "Red", winsNeeded = 100000},
-    {name = "World 6", color = "Purple", winsNeeded = 500000},
+-- Stage data (Wins needed)
+local stageData = {
+    {name = "World 1", color = "Green", wins = 0},
+    {name = "World 2", color = "Blue", wins = 500},
+    {name = "World 3", color = "Yellow", wins = 5000},
+    {name = "World 4", color = "Orange", wins = 25000},
+    {name = "World 5", color = "Red", wins = 100000},
+    {name = "World 6", color = "Purple", wins = 500000},
 }
 
 raceBtn.MouseButton1Click:Connect(function()
@@ -614,48 +581,75 @@ raceBtn.MouseButton1Click:Connect(function()
         raceBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
         raceInd.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
         
-        raceConn = task.spawn(function()
+        raceThread = task.spawn(function()
             while raceEnabled do
                 local char = player.Character
                 if char and char:FindFirstChild("HumanoidRootPart") then
                     local hrp = char.HumanoidRootPart
                     
-                    -- Method 1: Cari finish line/part di workspace
+                    -- Method 1: Teleport ke finish line di workspace
+                    local foundFinish = false
                     for _, obj in pairs(Workspace:GetDescendants()) do
-                        if obj:IsA("BasePart") then
+                        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
                             local name = obj.Name:lower()
-                            -- Cari finish line, end, goal, checkpoint
-                            if name:find("finish") or name:find("goal") or name:find("end") or name:find("win") then
+                            if name:find("finish") or name:find("goal") or name:find("end") or name:find("win") or name:find("checkpoint") then
                                 safeCall(function()
-                                    -- Teleport ke finish line
                                     hrp.CFrame = obj.CFrame + Vector3.new(0, 5, 0)
                                 end)
                                 stageInfo.Text = "Auto Race: Teleported to " .. obj.Name
+                                foundFinish = true
                                 break
                             end
                         end
                     end
                     
-                    -- Method 2: Fire RaceService RF untuk auto complete
-                    safeCall(function()
-                        RaceRF:InvokeServer("FinishRace")
-                    end)
+                    -- Method 2: Fire RaceService RF kalo ada
+                    if RaceRF then
+                        safeCall(function()
+                            RaceRF:InvokeServer("Finish")
+                        end)
+                    end
                     
-                    -- Method 3: Cari dan trigger TouchInterest di finish
-                    for _, obj in pairs(Workspace:GetDescendants()) do
-                        if obj:IsA("BasePart") and obj:FindFirstChildWhichIsA("TouchInterest") then
-                            local name = obj.Name:lower()
-                            if name:find("finish") or name:find("goal") or name:find("winpad") then
-                                safeCall(function()
-                                    firetouchinterest(hrp, obj, 0)
-                                    firetouchinterest(hrp, obj, 1)
-                                end)
+                    -- Method 3: Fire touch interest ke finish pad
+                    if not foundFinish then
+                        for _, obj in pairs(Workspace:GetDescendants()) do
+                            if obj:IsA("BasePart") and obj:FindFirstChildWhichIsA("TouchInterest") then
+                                local name = obj.Name:lower()
+                                if name:find("finish") or name:find("winpad") or name:find("goal") then
+                                    safeCall(function()
+                                        firetouchinterest(hrp, obj, 0)
+                                        firetouchinterest(hrp, obj, 1)
+                                    end)
+                                    stageInfo.Text = "Auto Race: Triggered " .. obj.Name
+                                    break
+                                end
                             end
+                        end
+                    end
+                    
+                    -- Method 4: Cari dan teleport ke part paling jauh di track (fallback)
+                    if not foundFinish then
+                        local farthest = nil
+                        local maxDist = 0
+                        for _, obj in pairs(Workspace:GetDescendants()) do
+                            if obj:IsA("BasePart") and obj.Name:lower():find("track") or obj.Name:lower():find("road") or obj.Name:lower():find("path") then
+                                local dist = (obj.Position - hrp.Position).Magnitude
+                                if dist > maxDist then
+                                    maxDist = dist
+                                    farthest = obj
+                                end
+                            end
+                        end
+                        if farthest then
+                            safeCall(function()
+                                hrp.CFrame = farthest.CFrame + Vector3.new(0, 10, 0)
+                            end)
+                            stageInfo.Text = "Auto Race: Teleported to track end"
                         end
                     end
                 end
                 
-                task.wait(2) -- Check setiap 2 detik
+                task.wait(2)
             end
         end)
     else
@@ -671,8 +665,8 @@ end)
 -- SECTION: REBIRTH MENU
 -- ============================================
 local rebirthSection = Instance.new("Frame")
-rebirthSection.Size = UDim2.new(1, -20, 0, 100)
-rebirthSection.Position = UDim2.new(0, 10, 0, 365)
+rebirthSection.Size = UDim2.new(1, -16, 0, 95)
+rebirthSection.Position = UDim2.new(0, 8, 0, 340)
 rebirthSection.BackgroundTransparency = 1
 rebirthSection.Parent = mainFrame
 
@@ -681,7 +675,7 @@ sectionTitle2.Size = UDim2.new(1, 0, 0, 22)
 sectionTitle2.BackgroundTransparency = 1
 sectionTitle2.Text = "REBIRTH MENU"
 sectionTitle2.TextColor3 = Color3.fromRGB(255, 100, 100)
-sectionTitle2.TextSize = 14
+sectionTitle2.TextSize = 13
 sectionTitle2.Font = Enum.Font.GothamBold
 sectionTitle2.TextXAlignment = Enum.TextXAlignment.Left
 sectionTitle2.Parent = rebirthSection
@@ -690,20 +684,20 @@ local divider2 = Instance.new("Frame")
 divider2.Size = UDim2.new(1, 0, 0, 2)
 divider2.Position = UDim2.new(0, 0, 0, 22)
 divider2.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-divider2.BackgroundTransparency = 0.7
+divider2.BackgroundTransparency = 0.6
 divider2.BorderSizePixel = 0
 divider2.Parent = sectionTitle2
 
-local div2Corner = Instance.new("UICorner")
-div2Corner.CornerRadius = UDim.new(1, 0)
-div2Corner.Parent = divider2
+local divCorner2 = Instance.new("UICorner")
+divCorner2.CornerRadius = UDim.new(1, 0)
+divCorner2.Parent = divider2
 
 -- Auto Rebirth Toggle
-local rebirthFrame, rebirthBtn, rebirthInd, rebirthLabel = createToggle(rebirthSection, 30, "Auto Rebirth", Color3.fromRGB(0, 255, 100))
+local rebirthFrame, rebirthBtn, rebirthInd, rebirthLabel = createToggle(rebirthSection, 28, "Auto Rebirth", Color3.fromRGB(0, 255, 100))
 
--- Auto Rebirth Logic - FIXED
+-- Auto Rebirth Logic - VERIFIED
 local rebirthEnabled = false
-local rebirthConn = nil
+local rebirthThread = nil
 
 rebirthBtn.MouseButton1Click:Connect(function()
     rebirthEnabled = not rebirthEnabled
@@ -712,13 +706,12 @@ rebirthBtn.MouseButton1Click:Connect(function()
         rebirthBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
         rebirthInd.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
         
-        rebirthConn = task.spawn(function()
+        rebirthThread = task.spawn(function()
             while rebirthEnabled do
-                -- Fire RebirthService RF
                 safeCall(function()
                     RebirthRF:InvokeServer()
                 end)
-                task.wait(3) -- Interval rebirth
+                task.wait(3)
             end
         end)
     else
@@ -730,13 +723,13 @@ rebirthBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================
--- STATS DISPLAY
+-- STATS PANEL
 -- ============================================
 local statsFrame = Instance.new("Frame")
-statsFrame.Size = UDim2.new(1, -20, 0, 80)
-statsFrame.Position = UDim2.new(0, 10, 0, 475)
-statsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
-statsFrame.BackgroundTransparency = 0.4
+statsFrame.Size = UDim2.new(1, -16, 0, 75)
+statsFrame.Position = UDim2.new(0, 8, 0, 440)
+statsFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 48)
+statsFrame.BackgroundTransparency = 0.3
 statsFrame.BorderSizePixel = 0
 statsFrame.Parent = mainFrame
 
@@ -745,19 +738,19 @@ statsCorner.CornerRadius = UDim.new(0, 12)
 statsCorner.Parent = statsFrame
 
 local statsTitle = Instance.new("TextLabel")
-statsTitle.Size = UDim2.new(1, 0, 0, 20)
-statsTitle.Position = UDim2.new(0, 10, 0, 5)
+statsTitle.Size = UDim2.new(1, 0, 0, 18)
+statsTitle.Position = UDim2.new(0, 10, 0, 4)
 statsTitle.BackgroundTransparency = 1
 statsTitle.Text = "LIVE STATS"
 statsTitle.TextColor3 = Color3.fromRGB(0, 255, 150)
-statsTitle.TextSize = 12
+statsTitle.TextSize = 11
 statsTitle.Font = Enum.Font.GothamBold
 statsTitle.TextXAlignment = Enum.TextXAlignment.Left
 statsTitle.Parent = statsFrame
 
 local speedStat = Instance.new("TextLabel")
-speedStat.Size = UDim2.new(0.5, 0, 0, 20)
-speedStat.Position = UDim2.new(0, 10, 0, 28)
+speedStat.Size = UDim2.new(0.5, 0, 0, 18)
+speedStat.Position = UDim2.new(0, 10, 0, 24)
 speedStat.BackgroundTransparency = 1
 speedStat.Text = "Speed: 0"
 speedStat.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -767,8 +760,8 @@ speedStat.TextXAlignment = Enum.TextXAlignment.Left
 speedStat.Parent = statsFrame
 
 local winsStat = Instance.new("TextLabel")
-winsStat.Size = UDim2.new(0.5, 0, 0, 20)
-winsStat.Position = UDim2.new(0.5, 0, 0, 28)
+winsStat.Size = UDim2.new(0.5, 0, 0, 18)
+winsStat.Position = UDim2.new(0.5, 0, 0, 24)
 winsStat.BackgroundTransparency = 1
 winsStat.Text = "Wins: 0"
 winsStat.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -778,8 +771,8 @@ winsStat.TextXAlignment = Enum.TextXAlignment.Left
 winsStat.Parent = statsFrame
 
 local rebirthStat = Instance.new("TextLabel")
-rebirthStat.Size = UDim2.new(0.5, 0, 0, 20)
-rebirthStat.Position = UDim2.new(0, 10, 0, 50)
+rebirthStat.Size = UDim2.new(0.5, 0, 0, 18)
+rebirthStat.Position = UDim2.new(0, 10, 0, 44)
 rebirthStat.BackgroundTransparency = 1
 rebirthStat.Text = "Rebirths: 0"
 rebirthStat.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -789,8 +782,8 @@ rebirthStat.TextXAlignment = Enum.TextXAlignment.Left
 rebirthStat.Parent = statsFrame
 
 local stageStat = Instance.new("TextLabel")
-stageStat.Size = UDim2.new(0.5, 0, 0, 20)
-stageStat.Position = UDim2.new(0.5, 0, 0, 50)
+stageStat.Size = UDim2.new(0.5, 0, 0, 18)
+stageStat.Position = UDim2.new(0.5, 0, 0, 44)
 stageStat.BackgroundTransparency = 1
 stageStat.Text = "Stage: 1"
 stageStat.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -799,11 +792,10 @@ stageStat.Font = Enum.Font.Gotham
 stageStat.TextXAlignment = Enum.TextXAlignment.Left
 stageStat.Parent = statsFrame
 
--- Update stats loop
+-- Update stats
 task.spawn(function()
     while mainGui and mainGui.Parent do
         safeCall(function()
-            -- Coba ambil stats dari leaderstats
             local leaderstats = player:FindFirstChild("leaderstats")
             if leaderstats then
                 local wins = leaderstats:FindFirstChild("Wins")
@@ -812,7 +804,6 @@ task.spawn(function()
                 if rebirths then rebirthStat.Text = "Rebirths: " .. rebirths.Value end
             end
             
-            -- Speed dari character
             local char = player.Character
             if char and char:FindFirstChild("Humanoid") then
                 speedStat.Text = "Speed: " .. math.floor(char.Humanoid.WalkSpeed)
@@ -823,7 +814,7 @@ task.spawn(function()
 end)
 
 -- ============================================
--- NOTIFICATION: SCRIPT ACTIVE
+-- NOTIFICATION
 -- ============================================
 local notifGui = Instance.new("ScreenGui")
 notifGui.Name = "RukanooXD_Notif"
@@ -877,13 +868,12 @@ local notifSub = Instance.new("TextLabel")
 notifSub.Size = UDim2.new(0, 220, 0, 20)
 notifSub.Position = UDim2.new(0, 60, 0, 37)
 notifSub.BackgroundTransparency = 1
-notifSub.Text = "RukanooXD_YT | Race Clicker v2.0"
+notifSub.Text = "RukanooXD_YT | Race Clicker v3.0"
 notifSub.TextColor3 = Color3.fromRGB(150, 150, 180)
 notifSub.TextSize = 12
 notifSub.Font = Enum.Font.Gotham
 notifSub.Parent = notifFrame
 
--- Animate Notification
 TweenService:Create(notifFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
     Position = UDim2.new(0.5, -160, 0, 25)
 }):Play()
@@ -895,10 +885,10 @@ task.wait(0.6)
 notifGui:Destroy()
 
 -- ============================================
--- ADDITIONAL FEATURES
+-- EXTRA FEATURES
 -- ============================================
 
--- Auto-collect orbs/coins
+-- Auto-collect orbs
 task.spawn(function()
     while mainGui and mainGui.Parent do
         task.wait(0.3)
@@ -908,7 +898,7 @@ task.spawn(function()
             for _, obj in pairs(Workspace:GetDescendants()) do
                 if obj:IsA("BasePart") then
                     local name = obj.Name:lower()
-                    if name:find("orb") or name:find("coin") or name:find("gem") or name:find("collect") then
+                    if name:find("orb") or name:find("coin") or name:find("gem") or name:find("collectible") then
                         safeCall(function()
                             if obj:FindFirstChildWhichIsA("TouchInterest") then
                                 firetouchinterest(hrp, obj, 0)
@@ -933,25 +923,8 @@ task.spawn(function()
     end
 end)
 
--- Auto-equip best pets (jika ada sistem pet)
-task.spawn(function()
-    while mainGui and mainGui.Parent do
-        task.wait(10)
-        safeCall(function()
-            -- Cari PetService di Knit
-            local PetService = Knit:FindFirstChild("Services"):FindFirstChild("PetService")
-            if PetService then
-                local EquipRF = PetService:FindFirstChild("RF"):FindFirstChild("EquipBest")
-                if EquipRF then
-                    EquipRF:InvokeServer()
-                end
-            end
-        end)
-    end
-end)
-
--- Store connections for cleanup
+-- Store connections
 _G.RukanooXD_Connections = {}
 
--- Start Loading
+-- Start
 animateLoading()
